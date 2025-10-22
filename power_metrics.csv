@@ -1,0 +1,13 @@
+Metric,VDD1,VDD2H,VDD2L,VDDQ,Unit
+Background Power,144.0,792.0,11.0,15.0,mW
+Refresh Power,65.35,299.54,0.83,1.13,mW
+Activate Power,161.79,732.63,0.0,0.0,mW
+Write Power,41.04,1544.4,0.0,0.0,mW
+Read Power,125.28,5385.6,0.0,0.0,mW
+Total DRAM Power,537.47,8754.17,11.83,16.13,mW
+RCD Power,0.0,0.0,0.0,0.0,mW
+DB Power,0.0,0.0,0.0,900.0,mW
+Termination Power,0.0,0.0,0.0,0.0,mW
+PMIC Power,87.49,1425.1,1.93,149.14,mW
+Total Power,624.96,10179.27,13.76,1065.27,mW
+Total Power (W),11.88,,,,mW
