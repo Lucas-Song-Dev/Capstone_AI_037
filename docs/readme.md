@@ -1,0 +1,10 @@
+Current Project Goal and Deliverables
+Our main project goal is to develop our own use-case Python DDR5/LPDDR5 power measurement tool that mirrors the original’s main deliverable, but now from scratch. The central deliverable is this power estimation tool. As this tool will be open-sourced, it will be hosted on GitHub, where we aim to set up an automated system as a sanity check to verify that new pull requests will not deviate heavily in case of error.
+
+We’ve decided on Python as we are building a high-level use-case model which won’t require heavy computation, as well as Python has better support for data visualization. If performance proves to be a bottleneck, we will explore implementing the calculation-critical sections in a more performant language such as C++ or Rust. 
+
+The program takes two input JSON files, the first being the “spec” containing the IDD current and voltage measurements for the specific component we are measuring (sourced from the manufacturer’s datasheets), and the second being the “workload” which contains the command traces that model the relative proportions of different types of traffic to the memory component. 
+
+For verifying that we are calculating the correct values, we will start off by comparing our outputs with manual calculations and the outputs of DRAMPower/DRAMSys, and possibly gather lab measurements in the future if our resources allow. We are also investigating possible DRAM simulators such as Ramulator 2.0 to simulate DRAM behaviour for power verification. The tool then outputs the total power calculation following JEDEC DDR5 and LPDDR5 specifications. We also aim to support providing visualizations, (e.g., power vs. bandwidth graphs) to better communicate our results.
+
+We want to focus on having a deep understanding of power consumption measurements for DRAM to be able to complete this project, using research papers and the existing tools DRAMPower and DRAMSys to help guide us. Learning is an important goal during this process as we want to come out of this experience with an edge over our peers on a hot topic in the modern tech industry.
