@@ -146,3 +146,33 @@ def parse_memspec_json(json_str: str) -> MemSpec:
     """
     data = json.loads(json_str)
     return parse_memspec_dict(data)
+
+
+
+## workload parser
+def normalize_workload(workload_json):
+    """Convert your workload JSON into the internal params used by the model."""
+    BNK_PRE    = workload_json["BNK_PRE_percent"] / 100.0
+    CKE_LO_PRE = workload_json["CKE_LO_PRE_percent"] / 100.0
+    CKE_LO_ACT = workload_json["CKE_LO_ACT_percent"] / 100.0
+
+    RDsch      = workload_json["RDsch_percent"] / 100.0
+    WRsch      = workload_json["WRsch_percent"] / 100.0
+
+    tRRDsch    = workload_json["tRRDsch_ns"] * 1e-9
+    tRC_sys    = workload_json["System_tRC_ns"] * 1e-9
+
+    return {
+        "BNK_PRE": BNK_PRE,
+        "CKE_LO_PRE": CKE_LO_PRE,
+        "CKE_LO_ACT": CKE_LO_ACT,
+        "RDsch": RDsch,
+        "WRsch": WRsch,
+        "tRRDsch": tRRDsch,
+        "tRC_sys": tRC_sys,
+        # keep the raw ones around if you want for later:
+        "RD_Data_Low_percent": workload_json["RD_Data_Low_percent"],
+        "WR_Data_Low_percent": workload_json["WR_Data_Low_percent"],
+        "termRDsch_percent": workload_json["termRDsch_percent"],
+        "termWRsch_percent": workload_json["termWRsch_percent"],
+    }
