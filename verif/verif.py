@@ -32,7 +32,7 @@ class TestResults:
             "status": "PASS",
             "details": details
         })
-        print(f"✅ PASS: {test_name}")
+        print(f"[PASS] {test_name}")
         if details:
             print(f"   {details}")
     
@@ -43,7 +43,7 @@ class TestResults:
             "status": "FAIL",
             "details": details
         })
-        print(f"❌ FAIL: {test_name}")
+        print(f"[FAIL] {test_name}")
         if details:
             print(f"   {details}")
     
@@ -165,11 +165,11 @@ def test_background_power_sensibility(results, model_output, empirical_data_path
             
             # Additional sanity check: Total power should be within reasonable range
             if model_total >= min_empirical and model_total <= max_empirical * 1.5:
-                print(f"✓ Model total power is within reasonable empirical range")
+                print(f"[OK] Model total power is within reasonable empirical range")
             else:
-                print(f"⚠ Model total power outside empirical range (may be acceptable)")
+                print(f"[WARN] Model total power outside empirical range (may be acceptable)")
         else:
-            print("⚠ Could not parse empirical data")
+            print("[WARN] Could not parse empirical data")
             results.add_pass("NF-01: Background power sensibility", 
                            f"No empirical data - model output verified: {model_background:.4f} W")
     else:
@@ -207,7 +207,7 @@ def test_runtime_performance(results):
         workload_full = os.path.join(os.path.dirname(__file__), "..", workload_path)
         
         if not os.path.exists(memspec_full):
-            print(f"⚠ Skipping {memspec_path} - file not found")
+            print(f"[SKIP] {memspec_path} - file not found")
             continue
         
         print(f"\nTesting: {os.path.basename(memspec_path)}")
@@ -224,13 +224,13 @@ def test_runtime_performance(results):
             
             if elapsed > 10.0:
                 all_passed = False
-                print(f"  ❌ Exceeds 10 second limit!")
+                print(f"  [FAIL] Exceeds 10 second limit!")
             else:
-                print(f"  ✓ Within time limit")
+                print(f"  [OK] Within time limit")
                 
         except Exception as e:
             elapsed = time.time() - start_time
-            print(f"  ❌ Error: {e}")
+            print(f"  [ERROR] {e}")
             all_passed = False
     
     if all_passed:
@@ -336,24 +336,24 @@ def test_input_format_validation(results):
             result = ddr5_core_power_model(memspec, workload)
             
             # If we get here, the model accepted invalid input
-            print(f"  ❌ Model did not reject invalid input")
+            print(f"  [FAIL] Model did not reject invalid input")
             
         except (KeyError, ValueError, TypeError) as e:
             # Good - model rejected invalid input
             error_msg = str(e)
-            print(f"  ✓ Model rejected invalid input")
+            print(f"  [OK] Model rejected invalid input")
             print(f"  Error message: {error_msg}")
             
             # Check if error message is useful (contains field name or type info)
             if any(keyword in error_msg.lower() for keyword in ['missing', 'invalid', 'field', 'key', 'type']):
-                print(f"  ✓ Error message is informative")
+                print(f"  [OK] Error message is informative")
                 passed_count += 1
             else:
-                print(f"  ⚠ Error message could be more informative")
+                print(f"  [WARN] Error message could be more informative")
         
         except Exception as e:
             # Model crashed - not graceful
-            print(f"  ❌ Model crashed ungracefully: {e}")
+            print(f"  [ERROR] Model crashed ungracefully: {e}")
     
     if passed_count == total_count:
         results.add_pass("C-03: Input format validation",
@@ -380,7 +380,7 @@ def test_output_regression(results, model_output, baseline_path):
     baseline_file = Path(baseline_path)
     
     if not baseline_file.exists():
-        print("⚠ No baseline found - creating initial baseline")
+        print("[WARN] No baseline found - creating initial baseline")
         baseline_file.parent.mkdir(parents=True, exist_ok=True)
         with open(baseline_file, 'w') as f:
             json.dump(model_output, f, indent=2)
@@ -407,12 +407,12 @@ def test_output_regression(results, model_output, baseline_path):
             rel_diff = abs(current_val - baseline_val) / (abs(baseline_val) + 1e-10)
             if rel_diff > tolerance:
                 differences.append(
-                    f"{key}: {baseline_val:.6f} → {current_val:.6f} "
-                    f"(Δ {rel_diff*100:.3f}%)"
+                    f"{key}: {baseline_val:.6f} -> {current_val:.6f} "
+                    f"(Delta {rel_diff*100:.3f}%)"
                 )
-                print(f"  ✗ {key}: {baseline_val:.6f} → {current_val:.6f}")
+                print(f"  [DIFF] {key}: {baseline_val:.6f} -> {current_val:.6f}")
             else:
-                print(f"  ✓ {key}: {current_val:.6f}")
+                print(f"  [OK] {key}: {current_val:.6f}")
     
     # Check for removed fields
     for key in baseline.keys():
@@ -452,13 +452,13 @@ def run_all_tests(empirical_data_path=None):
         workload = load_workload(workload_path)
         model_output = ddr5_core_power_model(memspec, workload)
         
-        print(f"\n✓ Model executed successfully")
+        print(f"\n[OK] Model executed successfully")
         print(f"\nModel Output:")
         for key, value in model_output.items():
             print(f"  {key}: {value:.6f} W")
         
     except Exception as e:
-        print(f"\n❌ Failed to run model: {e}")
+        print(f"\n[ERROR] Failed to run model: {e}")
         results.add_fail("Model Execution", str(e))
         return results.print_summary()
     
@@ -506,7 +506,7 @@ if __name__ == "__main__":
         with open(baseline_path, 'w') as f:
             json.dump(model_output, f, indent=2)
         
-        print(f"✓ Baseline updated: {baseline_path}\n")
+        print(f"[OK] Baseline updated: {baseline_path}\n")
     
     # Run tests
     all_passed = run_all_tests(args.empirical_data)
