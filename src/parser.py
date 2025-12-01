@@ -90,60 +90,112 @@ class Workload:
 # ---------- Memspec parsing ----------
 
 def load_memspec(path: str) -> MemSpec:
-    with open(path, "r") as f:
-        raw = json.load(f)
+    """
+    Load memory specification from JSON file with validation.
+    
+    Raises:
+        ValueError: If required fields are missing or have invalid values
+        FileNotFoundError: If the spec file doesn't exist
+    """
+    try:
+        with open(path, "r") as f:
+            raw = json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Memory specification file not found: {path}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in memory specification file: {e}")
+    
+    # Validate top-level structure
+    if "memspec" not in raw:
+        raise ValueError("Missing required field 'memspec' in JSON file")
+    
     raw = raw["memspec"]
+    
+    # Validate required sections
+    if "memarchitecturespec" not in raw:
+        raise ValueError("Missing required section 'memarchitecturespec' in memspec")
+    if "mempowerspec" not in raw:
+        raise ValueError("Missing required section 'mempowerspec' in memspec")
+    if "memtimingspec" not in raw:
+        raise ValueError("Missing required section 'memtimingspec' in memspec")
+    
     arch_raw = raw["memarchitecturespec"]
     p_raw = raw["mempowerspec"]
     t_raw = raw["memtimingspec"]
 
-    arch = MemArchitectureSpec(
-        width           = int(arch_raw["width"]),
-        nbrOfBanks      = int(arch_raw["nbrOfBanks"]),
-        nbrOfBankGroups = int(arch_raw["nbrOfBankGroups"]),
-        nbrOfRanks      = int(arch_raw["nbrOfRanks"]),
-        nbrOfColumns    = int(arch_raw["nbrOfColumns"]),
-        nbrOfRows       = int(arch_raw["nbrOfRows"]),
-        burstLength     = int(arch_raw["burstLength"]),
-        dataRate     = int(arch_raw["dataRate"]),
-    )
+    # Parse architecture with error handling
+    try:
+        arch = MemArchitectureSpec(
+            width           = int(arch_raw["width"]),
+            nbrOfBanks      = int(arch_raw["nbrOfBanks"]),
+            nbrOfBankGroups = int(arch_raw["nbrOfBankGroups"]),
+            nbrOfRanks      = int(arch_raw["nbrOfRanks"]),
+            nbrOfColumns    = int(arch_raw["nbrOfColumns"]),
+            nbrOfRows       = int(arch_raw["nbrOfRows"]),
+            burstLength     = int(arch_raw["burstLength"]),
+            dataRate        = int(arch_raw["dataRate"]),
+        )
+    except KeyError as e:
+        raise ValueError(f"Missing required field {e} in memarchitecturespec")
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid value in memarchitecturespec: {e}")
 
-    power = MemPowerSpec(
-        vdd   = float(p_raw["vdd"]),
-        vpp   = float(p_raw["vpp"]),
-        vddq  = float(p_raw["vddq"]),
+    # Parse power spec with detailed error handling
+    required_power_fields = [
+        "vdd", "vpp", "vddq",
+        "idd0", "idd2n", "idd3n", "idd4r", "idd4w", "idd5b", "idd6n", "idd2p", "idd3p",
+        "ipp0", "ipp2n", "ipp3n", "ipp4r", "ipp4w", "ipp5b", "ipp6n", "ipp2p", "ipp3p"
+    ]
+    
+    missing_fields = [field for field in required_power_fields if field not in p_raw]
+    if missing_fields:
+        raise ValueError(f"Missing required power spec field(s): {', '.join(missing_fields)}")
+    
+    try:
+        power = MemPowerSpec(
+            vdd   = float(p_raw["vdd"]),
+            vpp   = float(p_raw["vpp"]),
+            vddq  = float(p_raw["vddq"]),
 
-        idd0  = float(p_raw["idd0"]),
-        idd2n = float(p_raw["idd2n"]),
-        idd3n = float(p_raw["idd3n"]),
-        idd4r = float(p_raw["idd4r"]),
-        idd4w = float(p_raw["idd4w"]),
-        idd5b = float(p_raw["idd5b"]),
-        idd6n = float(p_raw["idd6n"]),
-        idd2p = float(p_raw["idd2p"]),
-        idd3p = float(p_raw["idd3p"]),
+            idd0  = float(p_raw["idd0"]),
+            idd2n = float(p_raw["idd2n"]),
+            idd3n = float(p_raw["idd3n"]),
+            idd4r = float(p_raw["idd4r"]),
+            idd4w = float(p_raw["idd4w"]),
+            idd5b = float(p_raw["idd5b"]),
+            idd6n = float(p_raw["idd6n"]),
+            idd2p = float(p_raw["idd2p"]),
+            idd3p = float(p_raw["idd3p"]),
 
-        ipp0  = float(p_raw["ipp0"]),
-        ipp2n = float(p_raw["ipp2n"]),
-        ipp3n = float(p_raw["ipp3n"]),
-        ipp4r = float(p_raw["ipp4r"]),
-        ipp4w = float(p_raw["ipp4w"]),
-        ipp5b = float(p_raw["ipp5b"]),
-        ipp6n = float(p_raw["ipp6n"]),
-        ipp2p = float(p_raw["ipp2p"]),
-        ipp3p = float(p_raw["ipp3p"]),
-    )
+            ipp0  = float(p_raw["ipp0"]),
+            ipp2n = float(p_raw["ipp2n"]),
+            ipp3n = float(p_raw["ipp3n"]),
+            ipp4r = float(p_raw["ipp4r"]),
+            ipp4w = float(p_raw["ipp4w"]),
+            ipp5b = float(p_raw["ipp5b"]),
+            ipp6n = float(p_raw["ipp6n"]),
+            ipp2p = float(p_raw["ipp2p"]),
+            ipp3p = float(p_raw["ipp3p"]),
+        )
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid value in mempowerspec: {e}")
 
-    timing = MemTimingSpec(
-        tCK  = float(t_raw["tCK"]),
-        RAS  = int(t_raw["RAS"]),
-        RCD  = int(t_raw["RCD"]),
-        RP   = int(t_raw["RP"]),
-        RFC1 = int(t_raw["RFC1"]),
-        RFC2 = int(t_raw["RFC2"]),
-        RFCsb = int(t_raw["RFCsb"]),
-        REFI = int(t_raw["REFI"]),
-    )
+    # Parse timing with error handling
+    try:
+        timing = MemTimingSpec(
+            tCK  = float(t_raw["tCK"]),
+            RAS  = int(t_raw["RAS"]),
+            RCD  = int(t_raw["RCD"]),
+            RP   = int(t_raw["RP"]),
+            RFC1 = int(t_raw["RFC1"]),
+            RFC2 = int(t_raw["RFC2"]),
+            RFCsb = int(t_raw["RFCsb"]),
+            REFI = int(t_raw["REFI"]),
+        )
+    except KeyError as e:
+        raise ValueError(f"Missing required field {e} in memtimingspec")
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid value in memtimingspec: {e}")
 
     return MemSpec(
         memoryId           = str(raw.get("memoryId", "")),
@@ -156,28 +208,55 @@ def load_memspec(path: str) -> MemSpec:
 
 # Workload parsing #
 def load_workload(path: str) -> Workload:
-    with open(path, "r") as f:
-        raw = json.load(f)
+    """
+    Load workload specification from JSON file with validation.
+    
+    Raises:
+        ValueError: If required fields are missing or have invalid values
+        FileNotFoundError: If the workload file doesn't exist
+    """
+    try:
+        with open(path, "r") as f:
+            raw = json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Workload file not found: {path}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in workload file: {e}")
+    
+    # Validate required fields
+    required_fields = [
+        "BNK_PRE_percent", "CKE_LO_PRE_percent", "CKE_LO_ACT_percent",
+        "PageHit_percent", "RDsch_percent", "RD_Data_Low_percent",
+        "WRsch_percent", "WR_Data_Low_percent", "termRDsch_percent",
+        "termWRsch_percent", "System_tRC_ns", "tRRDsch_ns"
+    ]
+    
+    missing_fields = [field for field in required_fields if field not in raw]
+    if missing_fields:
+        raise ValueError(f"Missing required workload field(s): {', '.join(missing_fields)}")
+    
+    try:
+        return Workload(
+            BNK_PRE_percent     = float(raw["BNK_PRE_percent"]),
+            CKE_LO_PRE_percent  = float(raw["CKE_LO_PRE_percent"]),
+            CKE_LO_ACT_percent  = float(raw["CKE_LO_ACT_percent"]),
 
-    return Workload(
-        BNK_PRE_percent     = float(raw["BNK_PRE_percent"]),
-        CKE_LO_PRE_percent  = float(raw["CKE_LO_PRE_percent"]),
-        CKE_LO_ACT_percent  = float(raw["CKE_LO_ACT_percent"]),
+            PageHit_percent     = float(raw["PageHit_percent"]),
 
-        PageHit_percent     = float(raw["PageHit_percent"]),
+            RDsch_percent       = float(raw["RDsch_percent"]),
+            RD_Data_Low_percent = float(raw["RD_Data_Low_percent"]),
 
-        RDsch_percent       = float(raw["RDsch_percent"]),
-        RD_Data_Low_percent = float(raw["RD_Data_Low_percent"]),
+            WRsch_percent       = float(raw["WRsch_percent"]),
+            WR_Data_Low_percent = float(raw["WR_Data_Low_percent"]),
 
-        WRsch_percent       = float(raw["WRsch_percent"]),
-        WR_Data_Low_percent = float(raw["WR_Data_Low_percent"]),
+            termRDsch_percent   = float(raw["termRDsch_percent"]),
+            termWRsch_percent   = float(raw["termWRsch_percent"]),
 
-        termRDsch_percent   = float(raw["termRDsch_percent"]),
-        termWRsch_percent   = float(raw["termWRsch_percent"]),
-
-        System_tRC_ns       = float(raw["System_tRC_ns"]),
-        tRRDsch_ns          = float(raw["tRRDsch_ns"]),
-    )
+            System_tRC_ns       = float(raw["System_tRC_ns"]),
+            tRRDsch_ns          = float(raw["tRRDsch_ns"]),
+        )
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid value in workload specification: {e}")
     """
     JEDEC/Micron-style DRAM power parameters.
 
