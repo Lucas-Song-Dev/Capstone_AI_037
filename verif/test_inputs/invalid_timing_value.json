@@ -1,0 +1,49 @@
+{
+  "memspec": {
+    "memoryId": "test",
+    "memoryType": "DDR5",
+    "memarchitecturespec": {
+      "width": 8,
+      "nbrOfBanks": 16,
+      "nbrOfBankGroups": 2,
+      "nbrOfRanks": 1,
+      "nbrOfColumns": 1024,
+      "nbrOfRows": 65536,
+      "burstLength": 8,
+      "dataRate": 2
+    },
+    "mempowerspec": {
+      "vdd": 1.1,
+      "vpp": 1.8,
+      "vddq": 1.1,
+      "idd0": 53.0,
+      "idd2n": 49.0,
+      "idd3n": 111.0,
+      "idd4r": 226.0,
+      "idd4w": 262.0,
+      "idd5b": 11539.0,
+      "idd6n": 50.0,
+      "idd2p": 47.0,
+      "idd3p": 110.0,
+      "ipp0": 9.0,
+      "ipp2n": 8.0,
+      "ipp3n": 8.0,
+      "ipp4r": 9.0,
+      "ipp4w": 22.0,
+      "ipp5b": 758.0,
+      "ipp6n": 8.0,
+      "ipp2p": 8.0,
+      "ipp3p": 8.0
+    },
+    "memtimingspec": {
+      "tCK": "invalid",
+      "RAS": 260,
+      "RCD": 136,
+      "RP": 136,
+      "RFC1": 2560,
+      "RFC2": 1920,
+      "RFCsb": 960,
+      "REFI": 51200
+    }
+  }
+}

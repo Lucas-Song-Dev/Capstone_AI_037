@@ -20,6 +20,10 @@ on:
 jobs:
   power-model-tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # For pushing baseline updates
+      pull-requests: write  # For commenting on PRs
+      issues: write  # For creating comments
     
     steps:
     - name: Checkout code
@@ -124,7 +128,8 @@ jobs:
         git push || echo "No changes to push"
     
     - name: Comment on PR with test results
-      if: github.event_name == 'pull_request' && steps.check_baseline.outputs.baseline_exists == 'true'
+      if: github.event_name == 'pull_request'
+      continue-on-error: true
       uses: actions/github-script@v7
       with:
         script: |
