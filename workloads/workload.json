@@ -1,0 +1,19 @@
+{
+  "BNK_PRE_percent": 4.8,
+  "CKE_LO_PRE_percent": 0.0,
+  "CKE_LO_ACT_percent": 0.0,
+
+  "PageHit_percent": 0.0,
+
+  "RDsch_percent": 15.0,
+  "RD_Data_Low_percent": 50.0,
+
+  "WRsch_percent": 7.0,
+  "WR_Data_Low_percent": 50.0,
+
+  "termRDsch_percent": 15.0,
+  "termWRsch_percent": 7.0,
+
+  "System_tRC_ns": 124.0,
+  "tRRDsch_ns": 11.3
+}

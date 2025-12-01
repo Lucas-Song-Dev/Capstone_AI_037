@@ -1,0 +1,45 @@
+{
+  "memspec": {
+    "memoryId": "ddr5",
+    "memoryType": "DDR5",
+    "memarchitecturespec": {
+        "nbrOfChannels": 0,
+        "nbrOfColumns": 1024,
+        "nbrOfRows": 65536,
+        "width": 4,
+        "burstLength": 8,
+        "maxBurstLength": 8,
+        "dataRate": 2,
+        "nbrOfBankGroups": 2,
+        "nbrOfBanks": 16,
+        "nbrOfRanks": 1,
+        "nbrOfDevices": 1,
+        "RefMode": 1
+    },
+    "mempowerspec": {
+        "IDD0": 53.00,
+        "IPP0": 9.00,
+
+        "IDD2P": 47.00,
+        "IDD2N": 49.00,
+
+        "IDD3P": 110.00,
+        "IDD3N": 111.00,
+        "IDD3N_1BNK": 52.88,
+
+        "IPP3N": 8.00,
+
+        "IDD4R": 226.00,
+        "IPP4R": 9.00,
+
+        "IDD4W": 262.00,
+        "IPP4W": 22.00,
+
+        "IDD5R": 432.00,
+        "IPP5R": 33.00,
+
+        "IDD5B": 11539.00,
+        "IPP5B": 758.00
+    }
+}
+}

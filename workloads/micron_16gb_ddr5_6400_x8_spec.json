@@ -1,0 +1,51 @@
+{
+  "memspec": {
+    "memoryId": "micron_16gb_ddr5_6400_x8",
+    "memoryType": "DDR5",
+    "memarchitecturespec": {
+      "width": 8,
+      "nbrOfBanks": 32,
+      "nbrOfBankGroups": 8,
+      "nbrOfRanks": 1,
+      "nbrOfColumns": 1024,
+      "nbrOfRows": 65536,
+      "burstLength": 16,
+      "dataRate": 2
+    },
+    "mempowerspec": {
+      "notes": "Values extracted from Micron 16Gb DDR5 Rev D Datasheet (Table 8)",
+      "vdd": 1.1,
+      "vpp": 1.8,
+      "vddq": 1.1,
+      "idd0": 53.0e-3,
+      "idd2n": 49.0e-3,
+      "idd3n": 111.0e-3,
+      "idd4r": 286.0e-3,
+      "idd4w": 295.0e-3,
+      "idd5b": 432.0e-3,
+      "idd6n": 112.0e-3,
+      "idd2p": 47.0e-3,
+      "idd3p": 110.0e-3,
+      "ipp0": 9.0e-3,
+      "ipp2n": 7.0e-3,
+      "ipp3n": 8.0e-3,
+      "ipp4r": 10.0e-3,
+      "ipp4w": 23.0e-3,
+      "ipp5b": 33.0e-3,
+      "ipp6n": 15.0e-3,
+      "ipp2p": 7.0e-3,
+      "ipp3p": 8.0e-3
+    },
+    "memtimingspec": {
+      "notes": "Timings for DDR5-6400 (CL-nRCD-nRP = 52-52-52)",
+      "tCK": 0.312e-9,
+      "RAS": 102,
+      "RCD": 52,
+      "RP": 52,
+      "RFC1": 945,
+      "RFC2": 513,
+      "RFCsb": 385,
+      "REFI": 12480
+    }
+  }
+}
