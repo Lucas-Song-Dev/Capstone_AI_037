@@ -1,0 +1,134 @@
+name: Regression Test
+
+on:
+  # Run on pull requests
+  pull_request:
+    branches: [ main, master, develop ]
+  
+  # Run on pushes to main/master to update baseline
+  push:
+    branches: [ main, master ]
+  
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      update_baseline:
+        description: 'Update baseline (yes/no)'
+        required: false
+        default: 'no'
+
+jobs:
+  regression-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for comparison
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Check if baseline exists
+      id: check_baseline
+      run: |
+        if [ -f "test_baseline/baseline_output.json" ]; then
+          echo "baseline_exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "baseline_exists=false" >> $GITHUB_OUTPUT
+        fi
+    
+    # On push to main/master: Always update baseline
+    - name: Create/Update Baseline (on main/master push)
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+      run: |
+        echo "::group::Creating Baseline"
+        python test_regression.py --save-baseline
+        echo "::endgroup::"
+    
+    # On manual trigger: Update baseline if requested
+    - name: Create/Update Baseline (manual)
+      if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_baseline == 'yes'
+      run: |
+        echo "::group::Creating Baseline"
+        python test_regression.py --save-baseline
+        echo "::endgroup::"
+    
+    # On PR: Compare with baseline
+    - name: Run Regression Test (PR)
+      if: github.event_name == 'pull_request'
+      run: |
+        if [ "${{ steps.check_baseline.outputs.baseline_exists }}" = "true" ]; then
+          echo "::group::Running Regression Test"
+          python test_regression.py --compare
+          echo "::endgroup::"
+        else
+          echo "::warning::No baseline found. Creating initial baseline..."
+          python test_regression.py --save-baseline
+          echo "::notice::Baseline created. Future PRs will be compared against this baseline."
+        fi
+    
+    - name: Upload generated images as artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: generated-visualizations
+        path: |
+          *.png
+          test_baseline/
+        retention-days: 30
+    
+    - name: Commit updated baseline (if on main/master)
+      if: |
+        (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.update_baseline == 'yes')
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add test_baseline/
+        git diff --staged --quiet || git commit -m "chore: update regression test baseline [skip ci]"
+        git push || echo "No changes to push"
+    
+    - name: Comment on PR with results
+      if: github.event_name == 'pull_request' && steps.check_baseline.outputs.baseline_exists == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          // Read the baseline if it exists
+          let comment = '## 📊 Regression Test Results\n\n';
+          
+          try {
+            const baseline = JSON.parse(fs.readFileSync('test_baseline/baseline_output.json', 'utf8'));
+            
+            comment += '✅ **Test Status:** Passed - All outputs match baseline\n\n';
+            comment += '### Generated Files:\n';
+            
+            for (const [filename, info] of Object.entries(baseline.files)) {
+              if (info.exists) {
+                comment += `- ✓ \`${filename}\` (${(info.size / 1024).toFixed(1)} KB)\n`;
+              }
+            }
+            
+            comment += '\n📦 Generated visualizations are available as workflow artifacts.\n';
+          } catch (err) {
+            comment += `⚠️ Could not read baseline results.\n\nError: ${err.message}`;
+          }
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
