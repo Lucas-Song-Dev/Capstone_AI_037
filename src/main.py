@@ -3,7 +3,7 @@ from typing import Dict
 
 
 def ddr5_core_power_model(memspec, workload) -> Dict[str, float]:
-    
+
     p = memspec.mempowerspec
     t = memspec.memtimingspec
 
@@ -18,7 +18,7 @@ def ddr5_core_power_model(memspec, workload) -> Dict[str, float]:
     tRFC1_s = t.RFC1 * tCK
     tREFI_s = t.REFI * tCK
 
-    # --- Convert workload percentages to fractions (0–1) where needed ---
+    # Convert workload percentages to fractions (0–1)
     BNK_PRE_frac    = workload.BNK_PRE_percent / 100.0
     CKE_LO_PRE_frac = workload.CKE_LO_PRE_percent / 100.0
     CKE_LO_ACT_frac = workload.CKE_LO_ACT_percent / 100.0
@@ -43,12 +43,11 @@ def ddr5_core_power_model(memspec, workload) -> Dict[str, float]:
     # --------------------------------------------------------------------
     # 2) Refresh power (VDD + VPP)
     # --------------------------------------------------------------------
-    if tREFI_s > 0.0:
-        duty_ref = tRFC1_s / tREFI_s
-    else:
-        duty_ref = 0.0
+    # Calculate fraction time require for one refresh / how often cells must be refreshed
+    duty_ref = tRFC1_s / tREFI_s
 
     # Incremental over active standby for refresh
+    # Vdd x extra current x fraction of time spent in refresh
     P_REF_vdd = vdd * (p.idd5b - p.idd3n) * duty_ref
     P_REF_vpp = vpp * (p.ipp5b - p.ipp3n) * duty_ref
     P_REF_core = P_REF_vdd + P_REF_vpp
@@ -64,15 +63,37 @@ def ddr5_core_power_model(memspec, workload) -> Dict[str, float]:
     P_WR_core = vdd * (p.idd4w - p.idd3n) * duty_wr
 
     # --------------------------------------------------------------------
-    # 4) Activate / Precharge incremental power (placeholder)
+    # 4) Activate / Precharge incremental power
     # --------------------------------------------------------------------
     P_ACT_PRE_core = 0.0
+    tRRDsch_s = workload.tRRDsch_ns * 1e-9
+
+    # Row cycle window (precharged -> ACT command -> active state -> PRE Command -> precharged)
+    t_row_cycle = tRAS + tRP
+
+    # Fraction of time spent in ACT+PRE windows (for VDD)
+    # time for 1 cycle / how often this happens
+    duty_act_pre = min(1.0, t_row_cycle / tRRDsch_s)
+
+    # Fraction of time spent actually raising wordlines (for VPP)
+    # vpp only used during ACT, not PRE command
+    duty_act_vpp = min(1.0, tRAS / tRRDsch_s)
+
+    ## todo: need to decide idd2n or idd3n
+    # Incremental ACT+PRE current over active standby (VDD)
+    P_ACT_PRE_vdd = vdd * (p.idd0 - p.idd2n) * duty_act_pre
+
+    # Incremental ACT VPP power over active standby
+    P_ACT_vpp = vpp * (p.ipp0 - p.ipp2n) * duty_act_vpp
+
+    # Total ACT/PRE core power (just for reporting)
+    P_ACT_PRE_core = P_ACT_PRE_vdd + P_ACT_vpp
 
     # --------------------------------------------------------------------
     # 5) Aggregate VDD, VPP and total core power
     # --------------------------------------------------------------------
-    P_VDD_core = P_background_vdd + P_ACT_PRE_core + P_RD_core + P_WR_core + P_REF_vdd
-    P_VPP_core = P_REF_vpp
+    P_VDD_core = P_background_vdd + P_RD_core + P_WR_core + P_REF_vdd + P_ACT_PRE_vdd
+    P_VPP_core = P_REF_vpp + P_ACT_vpp
     P_total_core = P_VDD_core + P_VPP_core
 
     return {

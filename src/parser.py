@@ -90,19 +90,6 @@ class Workload:
 # ---------- Memspec parsing ----------
 
 def load_memspec(path: str) -> MemSpec:
-    """
-    Parse a JSON memspec file into a structured MemSpec object.
-
-    Expected top-level JSON layout (adjust if your keys differ):
-
-    {
-      "memoryId": "DDR5-4800-1x16",
-      "memoryType": "DDR5",
-      "memarchitecturespec": { ... },
-      "mempowerspec": { ... },
-      "memtimingspec": { ... }
-    }
-    """
     with open(path, "r") as f:
         raw = json.load(f)
     raw = raw["memspec"]
@@ -191,3 +178,33 @@ def load_workload(path: str) -> Workload:
         System_tRC_ns       = float(raw["System_tRC_ns"]),
         tRRDsch_ns          = float(raw["tRRDsch_ns"]),
     )
+    """
+    JEDEC/Micron-style DRAM power parameters.
+
+    Voltages:
+      vdd      DRAM core supply (array logic + sense amps).
+      vpp      Wordline pump voltage used for ACT and REF operations.
+      vddq     I/O supply for DQ/DQS bus.
+
+    Core IDD currents:
+      idd0     Current during a full ACT → ACTIVE → PRE row cycle.
+      idd2n    Precharged standby current (CKE HIGH).
+      idd3n    Active standby current (one or more banks active).
+      idd4r    Current during read bursts (core internal read activation).
+      idd4w    Current during write bursts.
+      idd5b    Refresh current (per-bank refresh).
+      idd6n    Self-refresh current (CKE LOW, autonomous refresh).
+      idd2p    Precharged power-down current (CKE LOW).
+      idd3p    Active power-down current (CKE LOW).
+
+    VPP IPP currents:
+      ipp0     VPP current during ACTIVATE (wordline driver energy).
+      ipp2n    Precharged VPP standby current.
+      ipp3n    Active VPP standby current.
+      ipp4r    Additional VPP current during reads.
+      ipp4w    Additional VPP current during writes.
+      ipp5b    VPP current during refresh (wordline energization).
+      ipp6n    Self-refresh VPP current.
+      ipp2p    Precharged power-down VPP current.
+      ipp3p    Active power-down VPP current.
+    """
