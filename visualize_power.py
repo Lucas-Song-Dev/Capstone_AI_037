@@ -10,6 +10,8 @@ def load_data():
     power_metrics = pd.read_csv('power_metrics.csv')
     
     voltage_keys = [col for col in power_metrics.columns if col not in ['Metric', 'Unit']]
+
+    
     
     return component_data, dram_breakdown, power_metrics, voltage_keys
 
