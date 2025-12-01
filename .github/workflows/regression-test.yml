@@ -1,9 +1,9 @@
-name: Regression Test
+name: DDR5 Power Model - Regression Test
 
 on:
   # Run on pull requests
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [ main, master, develop, test ]
   
   # Run on pushes to main/master to update baseline
   push:
@@ -18,7 +18,7 @@ on:
         default: 'no'
 
 jobs:
-  regression-test:
+  power-model-tests:
     runs-on: ubuntu-latest
     
     steps:
@@ -37,21 +37,37 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        
+    - name: Verify project structure
+      run: |
+        echo "Checking project structure..."
+        ls -la
+        echo ""
+        echo "Source files:"
+        ls -la src/ || echo "No src/ directory"
+        echo ""
+        echo "Workload files:"
+        ls -la workloads/ || echo "No workloads/ directory"
+        echo ""
+        echo "Verification files:"
+        ls -la verif/ || echo "No verif/ directory"
     
     - name: Check if baseline exists
       id: check_baseline
       run: |
-        if [ -f "test_baseline/baseline_output.json" ]; then
+        if [ -f "verif/baseline/power_output_baseline.json" ]; then
           echo "baseline_exists=true" >> $GITHUB_OUTPUT
+          echo "✓ Baseline found at verif/baseline/power_output_baseline.json"
         else
           echo "baseline_exists=false" >> $GITHUB_OUTPUT
+          echo "⚠ No baseline found - will create on first run"
         fi
     
     # On push to main/master: Always update baseline
     - name: Create/Update Baseline (on main/master push)
       if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
       run: |
-        echo "::group::Creating Baseline"
+        echo "::group::Updating Power Model Baseline"
         python test_regression.py --save-baseline
         echo "::endgroup::"
     
@@ -59,32 +75,41 @@ jobs:
     - name: Create/Update Baseline (manual)
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_baseline == 'yes'
       run: |
-        echo "::group::Creating Baseline"
+        echo "::group::Updating Power Model Baseline"
         python test_regression.py --save-baseline
         echo "::endgroup::"
     
-    # On PR: Compare with baseline
-    - name: Run Regression Test (PR)
+    # On PR: Run full verification test suite
+    - name: Run Power Model Verification Tests (PR)
       if: github.event_name == 'pull_request'
       run: |
+        echo "::group::Running DDR5 Power Model Verification Suite"
         if [ "${{ steps.check_baseline.outputs.baseline_exists }}" = "true" ]; then
-          echo "::group::Running Regression Test"
-          python test_regression.py --compare
-          echo "::endgroup::"
+          echo "Running tests against existing baseline..."
+          python test_regression.py
         else
           echo "::warning::No baseline found. Creating initial baseline..."
           python test_regression.py --save-baseline
           echo "::notice::Baseline created. Future PRs will be compared against this baseline."
         fi
+        echo "::endgroup::"
     
-    - name: Upload generated images as artifacts
+    - name: Display baseline values
+      if: always()
+      run: |
+        if [ -f "verif/baseline/power_output_baseline.json" ]; then
+          echo "Current Power Model Baseline:"
+          cat verif/baseline/power_output_baseline.json
+        fi
+    
+    - name: Upload test results as artifacts
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: generated-visualizations
+        name: power-model-test-results
         path: |
-          *.png
-          test_baseline/
+          verif/baseline/
+          verif/test_inputs/
         retention-days: 30
     
     - name: Commit updated baseline (if on main/master)
@@ -94,35 +119,58 @@ jobs:
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add test_baseline/
-        git diff --staged --quiet || git commit -m "chore: update regression test baseline [skip ci]"
+        git add verif/baseline/
+        git diff --staged --quiet || git commit -m "chore: update power model baseline [skip ci]"
         git push || echo "No changes to push"
     
-    - name: Comment on PR with results
+    - name: Comment on PR with test results
       if: github.event_name == 'pull_request' && steps.check_baseline.outputs.baseline_exists == 'true'
       uses: actions/github-script@v7
       with:
         script: |
           const fs = require('fs');
           
-          // Read the baseline if it exists
-          let comment = '## 📊 Regression Test Results\n\n';
+          let comment = '## ⚡ DDR5 Power Model - Test Results\n\n';
           
           try {
-            const baseline = JSON.parse(fs.readFileSync('test_baseline/baseline_output.json', 'utf8'));
+            // Read the power model baseline
+            const baseline = JSON.parse(fs.readFileSync('verif/baseline/power_output_baseline.json', 'utf8'));
             
-            comment += '✅ **Test Status:** Passed - All outputs match baseline\n\n';
-            comment += '### Generated Files:\n';
+            comment += '✅ **Test Status:** All verification tests passed\n\n';
+            comment += '### Power Model Output:\n\n';
+            comment += '| Component | Power (W) |\n';
+            comment += '|-----------|----------:|\n';
             
-            for (const [filename, info] of Object.entries(baseline.files)) {
-              if (info.exists) {
-                comment += `- ✓ \`${filename}\` (${(info.size / 1024).toFixed(1)} KB)\n`;
+            // Display key power metrics
+            const keyMetrics = [
+              'P_total_core',
+              'P_VDD_core', 
+              'P_VPP_core',
+              'P_ACT_STBY_core',
+              'P_PRE_STBY_core',
+              'P_RD_core',
+              'P_WR_core',
+              'P_REF_core'
+            ];
+            
+            for (const key of keyMetrics) {
+              if (baseline[key] !== undefined) {
+                const label = key.replace('P_', '').replace('_core', '').replace(/_/g, ' ');
+                comment += `| ${label} | ${baseline[key].toFixed(6)} |\n`;
               }
             }
             
-            comment += '\n📦 Generated visualizations are available as workflow artifacts.\n';
+            comment += '\n### Tests Passed:\n';
+            comment += '- ✅ **NF-01:** Background power sensibility check\n';
+            comment += '- ✅ **NF-02:** Runtime performance (< 10 seconds)\n';
+            comment += '- ✅ **C-03:** Input format validation\n';
+            comment += '- ✅ **F-02:** Regression validation (outputs match baseline)\n';
+            
+            comment += '\n📊 Full test results available in workflow artifacts.\n';
+            
           } catch (err) {
-            comment += `⚠️ Could not read baseline results.\n\nError: ${err.message}`;
+            comment += `⚠️ Could not read test results.\n\nError: ${err.message}\n`;
+            comment += '\nThe tests may have failed or the baseline may not exist yet.\n';
           }
           
           github.rest.issues.createComment({
