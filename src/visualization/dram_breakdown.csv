@@ -1,6 +1,0 @@
-Power_Type,VDD1,VDD2H,VDD2L,VDDQ,Total_mW
-Background Power,144.0,792.0,11.0,15.0,962.0
-Refresh Power,65.35,299.54,0.83,1.13,366.85
-Activate Power,161.79,732.63,0.0,0.0,894.42
-Write Power,41.04,1544.4,0.0,0.0,1585.44
-Read Power,125.28,5385.6,0.0,0.0,5510.88
