@@ -1,3 +1,5 @@
+# parser.py
+
 import json
 from dataclasses import dataclass
 from typing import Any, Dict
@@ -7,6 +9,7 @@ from typing import Any, Dict
 
 @dataclass
 class MemArchitectureSpec:
+    """Static DRAM geometry parameters."""
     width: int
     nbrOfBanks: int
     nbrOfBankGroups: int
@@ -14,15 +17,17 @@ class MemArchitectureSpec:
     nbrOfColumns: int
     nbrOfRows: int
     burstLength: int
-    dataRate: int
-
+    dataRate: 2
 
 @dataclass
 class MemPowerSpec:
-    notes: str
+    """JEDEC-like IDD/IPP currents and supply voltages."""
+    # Voltages
     vdd: float
     vpp: float
     vddq: float
+
+    # Core IDD currents (A)
     idd0: float
     idd2n: float
     idd3n: float
@@ -32,6 +37,8 @@ class MemPowerSpec:
     idd6n: float
     idd2p: float
     idd3p: float
+
+    # VPP IPP currents (A)
     ipp0: float
     ipp2n: float
     ipp3n: float
@@ -45,8 +52,7 @@ class MemPowerSpec:
 
 @dataclass
 class MemTimingSpec:
-    notes: str
-    tCK: float
+    tCK: float        # clock period in seconds
     RAS: int
     RCD: int
     RP: int
@@ -65,114 +71,123 @@ class MemSpec:
     memtimingspec: MemTimingSpec
 
 
-# ---------- Parsing helpers ----------
+''' workload dataclass '''
+@dataclass
+class Workload:
+    BNK_PRE_percent: float
+    CKE_LO_PRE_percent: float
+    CKE_LO_ACT_percent: float
+    PageHit_percent: float
+    RDsch_percent: float
+    RD_Data_Low_percent: float
+    WRsch_percent: float
+    WR_Data_Low_percent: float
+    termRDsch_percent: float
+    termWRsch_percent: float
+    System_tRC_ns: float
+    tRRDsch_ns: float
 
-def _parse_mem_arch_spec(d: Dict[str, Any]) -> MemArchitectureSpec:
-    return MemArchitectureSpec(
-        width=int(d["width"]),
-        nbrOfBanks=int(d["nbrOfBanks"]),
-        nbrOfBankGroups=int(d["nbrOfBankGroups"]),
-        nbrOfRanks=int(d["nbrOfRanks"]),
-        nbrOfColumns=int(d["nbrOfColumns"]),
-        nbrOfRows=int(d["nbrOfRows"]),
-        burstLength=int(d["burstLength"]),
-        dataRate=int(d["dataRate"]),
-    )
+# ---------- Memspec parsing ----------
 
-
-def _parse_mem_power_spec(d: Dict[str, Any]) -> MemPowerSpec:
-    return MemPowerSpec(
-        notes=str(d.get("notes", "")),
-        vdd=float(d["vdd"]),
-        vpp=float(d["vpp"]),
-        vddq=float(d["vddq"]),
-        idd0=float(d["idd0"]),
-        idd2n=float(d["idd2n"]),
-        idd3n=float(d["idd3n"]),
-        idd4r=float(d["idd4r"]),
-        idd4w=float(d["idd4w"]),
-        idd5b=float(d["idd5b"]),
-        idd6n=float(d["idd6n"]),
-        idd2p=float(d["idd2p"]),
-        idd3p=float(d["idd3p"]),
-        ipp0=float(d["ipp0"]),
-        ipp2n=float(d["ipp2n"]),
-        ipp3n=float(d["ipp3n"]),
-        ipp4r=float(d["ipp4r"]),
-        ipp4w=float(d["ipp4w"]),
-        ipp5b=float(d["ipp5b"]),
-        ipp6n=float(d["ipp6n"]),
-        ipp2p=float(d["ipp2p"]),
-        ipp3p=float(d["ipp3p"]),
-    )
-
-
-def _parse_mem_timing_spec(d: Dict[str, Any]) -> MemTimingSpec:
-    return MemTimingSpec(
-        notes=str(d.get("notes", "")),
-        tCK=float(d["tCK"]),
-        RAS=int(d["RAS"]),
-        RCD=int(d["RCD"]),
-        RP=int(d["RP"]),
-        RFC1=int(d["RFC1"]),
-        RFC2=int(d["RFC2"]),
-        RFCsb=int(d["RFCsb"]),
-        REFI=int(d["REFI"]),
-    )
-
-
-def parse_memspec_dict(d: Dict[str, Any]) -> MemSpec:
+def load_memspec(path: str) -> MemSpec:
     """
-    Parse a Python dict (already loaded from JSON) into a MemSpec object.
-    Expects the outer structure to have key 'memspec' like in your example.
-    """
-    if "memspec" not in d:
-        raise ValueError("Top-level JSON must contain key 'memspec'.")
+    Parse a JSON memspec file into a structured MemSpec object.
 
-    ms = d["memspec"]
+    Expected top-level JSON layout (adjust if your keys differ):
+
+    {
+      "memoryId": "DDR5-4800-1x16",
+      "memoryType": "DDR5",
+      "memarchitecturespec": { ... },
+      "mempowerspec": { ... },
+      "memtimingspec": { ... }
+    }
+    """
+    with open(path, "r") as f:
+        raw = json.load(f)
+    raw = raw["memspec"]
+    arch_raw = raw["memarchitecturespec"]
+    p_raw = raw["mempowerspec"]
+    t_raw = raw["memtimingspec"]
+
+    arch = MemArchitectureSpec(
+        width           = int(arch_raw["width"]),
+        nbrOfBanks      = int(arch_raw["nbrOfBanks"]),
+        nbrOfBankGroups = int(arch_raw["nbrOfBankGroups"]),
+        nbrOfRanks      = int(arch_raw["nbrOfRanks"]),
+        nbrOfColumns    = int(arch_raw["nbrOfColumns"]),
+        nbrOfRows       = int(arch_raw["nbrOfRows"]),
+        burstLength     = int(arch_raw["burstLength"]),
+        dataRate     = int(arch_raw["dataRate"]),
+    )
+
+    power = MemPowerSpec(
+        vdd   = float(p_raw["vdd"]),
+        vpp   = float(p_raw["vpp"]),
+        vddq  = float(p_raw["vddq"]),
+
+        idd0  = float(p_raw["idd0"]),
+        idd2n = float(p_raw["idd2n"]),
+        idd3n = float(p_raw["idd3n"]),
+        idd4r = float(p_raw["idd4r"]),
+        idd4w = float(p_raw["idd4w"]),
+        idd5b = float(p_raw["idd5b"]),
+        idd6n = float(p_raw["idd6n"]),
+        idd2p = float(p_raw["idd2p"]),
+        idd3p = float(p_raw["idd3p"]),
+
+        ipp0  = float(p_raw["ipp0"]),
+        ipp2n = float(p_raw["ipp2n"]),
+        ipp3n = float(p_raw["ipp3n"]),
+        ipp4r = float(p_raw["ipp4r"]),
+        ipp4w = float(p_raw["ipp4w"]),
+        ipp5b = float(p_raw["ipp5b"]),
+        ipp6n = float(p_raw["ipp6n"]),
+        ipp2p = float(p_raw["ipp2p"]),
+        ipp3p = float(p_raw["ipp3p"]),
+    )
+
+    timing = MemTimingSpec(
+        tCK  = float(t_raw["tCK"]),
+        RAS  = int(t_raw["RAS"]),
+        RCD  = int(t_raw["RCD"]),
+        RP   = int(t_raw["RP"]),
+        RFC1 = int(t_raw["RFC1"]),
+        RFC2 = int(t_raw["RFC2"]),
+        RFCsb = int(t_raw["RFCsb"]),
+        REFI = int(t_raw["REFI"]),
+    )
 
     return MemSpec(
-        memoryId=str(ms["memoryId"]),
-        memoryType=str(ms["memoryType"]),
-        memarchitecturespec=_parse_mem_arch_spec(ms["memarchitecturespec"]),
-        mempowerspec=_parse_mem_power_spec(ms["mempowerspec"]),
-        memtimingspec=_parse_mem_timing_spec(ms["memtimingspec"]),
+        memoryId           = str(raw.get("memoryId", "")),
+        memoryType         = str(raw.get("memoryType", "")),
+        memarchitecturespec = arch,
+        mempowerspec        = power,
+        memtimingspec       = timing,
     )
 
 
-def parse_memspec_json(json_str: str) -> MemSpec:
-    """
-    Parse a JSON string into a MemSpec object.
-    """
-    data = json.loads(json_str)
-    return parse_memspec_dict(data)
+# Workload parsing #
+def load_workload(path: str) -> Workload:
+    with open(path, "r") as f:
+        raw = json.load(f)
 
+    return Workload(
+        BNK_PRE_percent     = float(raw["BNK_PRE_percent"]),
+        CKE_LO_PRE_percent  = float(raw["CKE_LO_PRE_percent"]),
+        CKE_LO_ACT_percent  = float(raw["CKE_LO_ACT_percent"]),
 
+        PageHit_percent     = float(raw["PageHit_percent"]),
 
-## workload parser
-def normalize_workload(workload_json):
-    """Convert your workload JSON into the internal params used by the model."""
-    BNK_PRE    = workload_json["BNK_PRE_percent"] / 100.0
-    CKE_LO_PRE = workload_json["CKE_LO_PRE_percent"] / 100.0
-    CKE_LO_ACT = workload_json["CKE_LO_ACT_percent"] / 100.0
+        RDsch_percent       = float(raw["RDsch_percent"]),
+        RD_Data_Low_percent = float(raw["RD_Data_Low_percent"]),
 
-    RDsch      = workload_json["RDsch_percent"] / 100.0
-    WRsch      = workload_json["WRsch_percent"] / 100.0
+        WRsch_percent       = float(raw["WRsch_percent"]),
+        WR_Data_Low_percent = float(raw["WR_Data_Low_percent"]),
 
-    tRRDsch    = workload_json["tRRDsch_ns"] * 1e-9
-    tRC_sys    = workload_json["System_tRC_ns"] * 1e-9
+        termRDsch_percent   = float(raw["termRDsch_percent"]),
+        termWRsch_percent   = float(raw["termWRsch_percent"]),
 
-    return {
-        "BNK_PRE": BNK_PRE,
-        "CKE_LO_PRE": CKE_LO_PRE,
-        "CKE_LO_ACT": CKE_LO_ACT,
-        "RDsch": RDsch,
-        "WRsch": WRsch,
-        "tRRDsch": tRRDsch,
-        "tRC_sys": tRC_sys,
-        # keep the raw ones around if you want for later:
-        "RD_Data_Low_percent": workload_json["RD_Data_Low_percent"],
-        "WR_Data_Low_percent": workload_json["WR_Data_Low_percent"],
-        "termRDsch_percent": workload_json["termRDsch_percent"],
-        "termWRsch_percent": workload_json["termWRsch_percent"],
-    }
+        System_tRC_ns       = float(raw["System_tRC_ns"]),
+        tRRDsch_ns          = float(raw["tRRDsch_ns"]),
+    )

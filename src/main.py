@@ -1,126 +1,108 @@
-from parser import parse_memspec_json, normalize_workload
-import json
+from parser import load_memspec, load_workload
+from typing import Dict
 
 
-def ddr5_core_power(memspec, workload):
-    p = memspec["mempowerspec"]
-    t = memspec["memtimingspec"]
+def ddr5_core_power_model(memspec, workload) -> Dict[str, float]:
+    
+    p = memspec.mempowerspec
+    t = memspec.memtimingspec
 
-    vdd = p["vdd"]
-    vpp = p["vpp"]
+    # Voltages
+    vdd = p.vdd
+    vpp = p.vpp
 
-    tCK   = t["tCK"]
-    tRAS  = t["RAS"] * tCK
-    tRP   = t["RP"] * tCK
-    tRC   = (t["RAS"] + t["RP"]) * tCK
-    tRFC  = t["RFC1"] * tCK
-    tREFI = t["REFI"] * tCK
+    # Basic timing in seconds
+    tCK = t.tCK
+    tRAS = t.RAS * tCK
+    tRP = t.RP * tCK
+    tRFC1_s = t.RFC1 * tCK
+    tREFI_s = t.REFI * tCK
 
-    BNK_PRE      = workload["BNK_PRE"]
-    CKE_LO_PRE   = workload["CKE_LO_PRE"]
-    CKE_LO_ACT   = workload["CKE_LO_ACT"]
-    RDsch        = workload["RDsch"]
-    WRsch        = workload["WRsch"]
-    tRRDsch      = workload["tRRDsch"]
+    # --- Convert workload percentages to fractions (0–1) where needed ---
+    BNK_PRE_frac    = workload.BNK_PRE_percent / 100.0
+    CKE_LO_PRE_frac = workload.CKE_LO_PRE_percent / 100.0
+    CKE_LO_ACT_frac = workload.CKE_LO_ACT_percent / 100.0
 
-    # ----- background VDD -----
-    P_PRE_PDN  = p["idd2p"] * vdd
-    P_PRE_STBY = p["idd2n"] * vdd
-    P_ACT_PDN  = p["idd3p"] * vdd
-    P_ACT_STBY = p["idd3n"] * vdd
+    RD_frac = workload.RDsch_percent / 100.0
+    WR_frac = workload.WRsch_percent / 100.0
 
-    BNK_ACT = 1.0 - BNK_PRE
+    # --------------------------------------------------------------------
+    # 1) Background (standby) power (VDD)
+    # --------------------------------------------------------------------
+    # Precharged background: blend IDD2N and IDD2P based on CKE low
+    I_PRE_bg = (1.0 - CKE_LO_PRE_frac) * p.idd2n + CKE_LO_PRE_frac * p.idd2p
+    P_PRE_STBY_core = vdd * I_PRE_bg
 
-    P_bg_VDD = (
-        P_PRE_PDN  * BNK_PRE * CKE_LO_PRE +
-        P_PRE_STBY * BNK_PRE * (1 - CKE_LO_PRE) +
-        P_ACT_PDN  * BNK_ACT * CKE_LO_ACT +
-        P_ACT_STBY * BNK_ACT * (1 - CKE_LO_ACT)
-    )
+    # Active background: blend IDD3N and IDD3P based on CKE low
+    I_ACT_bg = (1.0 - CKE_LO_ACT_frac) * p.idd3n + CKE_LO_ACT_frac * p.idd3p
+    P_ACT_STBY_core = vdd * I_ACT_bg
 
-    # ----- background VPP -----
-    P_PRE_PDN_vpp  = p["ipp2p"] * vpp
-    P_PRE_STBY_vpp = p["ipp2n"] * vpp
-    P_ACT_PDN_vpp  = p["ipp3p"] * vpp
-    P_ACT_STBY_vpp = p["ipp3n"] * vpp
+    # Mix precharged vs active background based on BNK_PRE fraction
+    P_background_vdd = BNK_PRE_frac * P_PRE_STBY_core + (1.0 - BNK_PRE_frac) * P_ACT_STBY_core
 
-    P_bg_VPP = (
-        P_PRE_PDN_vpp  * BNK_PRE * CKE_LO_PRE +
-        P_PRE_STBY_vpp * BNK_PRE * (1 - CKE_LO_PRE) +
-        P_ACT_PDN_vpp  * BNK_ACT * CKE_LO_ACT +
-        P_ACT_STBY_vpp * BNK_ACT * (1 - CKE_LO_ACT)
-    )
+    # --------------------------------------------------------------------
+    # 2) Refresh power (VDD + VPP)
+    # --------------------------------------------------------------------
+    if tREFI_s > 0.0:
+        duty_ref = tRFC1_s / tREFI_s
+    else:
+        duty_ref = 0.0
 
-    # ----- ACT -----
-    extra_idd_act = p["idd0"] - (p["idd3n"] * tRAS / tRC + p["idd2n"] * (tRC - tRAS) / tRC)
-    if extra_idd_act < 0:
-        extra_idd_act = 0.0
+    # Incremental over active standby for refresh
+    P_REF_vdd = vdd * (p.idd5b - p.idd3n) * duty_ref
+    P_REF_vpp = vpp * (p.ipp5b - p.ipp3n) * duty_ref
+    P_REF_core = P_REF_vdd + P_REF_vpp
 
-    P_ACT_ds = extra_idd_act * vdd
-    P_ACT = P_ACT_ds * (tRC / tRRDsch)
+    # --------------------------------------------------------------------
+    # 3) Read / Write incremental power (VDD)
+    # --------------------------------------------------------------------
+    # Treat RDsch_percent / WRsch_percent as duty cycles of "read" or "write" activity
+    duty_rd = RD_frac
+    duty_wr = WR_frac
 
-    extra_ipp_act = p["ipp0"] - (p["ipp3n"] * tRAS / tRC + p["ipp2n"] * (tRC - tRAS) / tRC)
-    if extra_ipp_act < 0:
-        extra_ipp_act = 0.0
+    P_RD_core = vdd * (p.idd4r - p.idd3n) * duty_rd
+    P_WR_core = vdd * (p.idd4w - p.idd3n) * duty_wr
 
-    P_ACT_VPP_ds = extra_ipp_act * vpp
-    P_ACT_VPP = P_ACT_VPP_ds * (tRC / tRRDsch)
+    # --------------------------------------------------------------------
+    # 4) Activate / Precharge incremental power (placeholder)
+    # --------------------------------------------------------------------
+    P_ACT_PRE_core = 0.0
 
-    # ----- RD/WR -----
-    P_WR_ds = (p["idd4w"] - p["idd3n"]) * vdd
-    P_RD_ds = (p["idd4r"] - p["idd3n"]) * vdd
-    P_WR = P_WR_ds * WRsch
-    P_RD = P_RD_ds * RDsch
-
-    P_WR_VPP_ds = (p["ipp4w"] - p["ipp3n"]) * vpp
-    P_RD_VPP_ds = (p["ipp4r"] - p["ipp3n"]) * vpp
-    P_WR_VPP = P_WR_VPP_ds * WRsch
-    P_RD_VPP = P_RD_VPP_ds * RDsch
-
-    # ----- REF -----
-    P_REF_ds = (p["idd5b"] - p["idd3n"]) * vdd
-    P_REF = P_REF_ds * (tRFC / tREFI)
-
-    P_REF_VPP_ds = (p["ipp5b"] - p["ipp3n"]) * vpp
-    P_REF_VPP = P_REF_VPP_ds * (tRFC / tREFI)
-
-    P_VDD_core = P_bg_VDD + P_ACT + P_WR + P_RD + P_REF
-    P_VPP_core = P_bg_VPP + P_ACT_VPP + P_WR_VPP + P_RD_VPP + P_REF_VPP
+    # --------------------------------------------------------------------
+    # 5) Aggregate VDD, VPP and total core power
+    # --------------------------------------------------------------------
+    P_VDD_core = P_background_vdd + P_ACT_PRE_core + P_RD_core + P_WR_core + P_REF_vdd
+    P_VPP_core = P_REF_vpp
+    P_total_core = P_VDD_core + P_VPP_core
 
     return {
+        "P_PRE_STBY_core": P_PRE_STBY_core,
+        "P_ACT_STBY_core": P_ACT_STBY_core,
+        "P_ACT_PRE_core": P_ACT_PRE_core,
+        "P_RD_core": P_RD_core,
+        "P_WR_core": P_WR_core,
+        "P_REF_core": P_REF_core,
         "P_VDD_core": P_VDD_core,
         "P_VPP_core": P_VPP_core,
-        "P_total_core": P_VDD_core + P_VPP_core,
+        "P_total_core": P_total_core,
     }
 
+def main():
+    # load memspec dataclass, workload dataclass
+    memspec = load_memspec("../workloads/micron_16gb_ddr5_6400_x8_spec.json")
+    workload = load_workload("../workloads/workload.json")
+    result = ddr5_core_power_model(memspec, workload)
 
-
-
-def main() -> None:
-    # load memspec + workload
-    with open("../workloads/micron_16gb_ddr5_6400_x8_spec.json") as f:
-        memspec_root = json.load(f)
-    memspec = memspec_root["memspec"]
-
-    with open("../workloads/workload.json") as f:
-        workload_json = json.load(f)
-
-    workload = normalize_workload(workload_json)
-
-    result = ddr5_core_power(memspec, workload)
-
-    print("P_VDD_core (W):", result["P_VDD_core"])
-    print("P_VPP_core (W):", result["P_VPP_core"])
-    print("P_total_core (W):", result["P_total_core"])
-
-    # Example: print some parsed fields
-    # print("Memory ID:", memspec.memoryId)
-    # print("Type:", memspec.memoryType)
-    # print("Width (bits):", memspec.memarchitecturespec.width)
-    # print("Banks:", memspec.memarchitecturespec.nbrOfBanks)
-    # print("IDD4R (A):", memspec.mempowerspec.idd4r)
-    # print("tCK (s):", memspec.memtimingspec.tCK)
-
+    print("=== Core Power Breakdown ===")
+    print("P_PRE_STBY_core (W):", f"{result['P_PRE_STBY_core']:.4f}")
+    print("P_ACT_STBY_core (W):", f"{result['P_ACT_STBY_core']:.4f}")
+    print("P_ACT_PRE_core (W):", f"{result['P_ACT_PRE_core']:.4f}")
+    print("P_RD_core (W):",       f"{result['P_RD_core']:.4f}")
+    print("P_WR_core (W):",       f"{result['P_WR_core']:.4f}")
+    print("P_REF_core (W):",      f"{result['P_REF_core']:.4f}")
+    print("P_VDD_core (W):",      f"{result['P_VDD_core']:.4f}")
+    print("P_VPP_core (W):",      f"{result['P_VPP_core']:.4f}")
+    print("P_total_core (W):",    f"{result['P_total_core']:.4f}")
 
 if __name__ == "__main__":
     main()
