@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,12 +29,27 @@ export function PresetSelector({
   const selectedPreset = memoryPresets.find((p) => p.id === selectedMemoryId);
   const initialManufacturer = selectedPreset?.manufacturer || defaultManufacturer || manufacturers[0];
   const [activeTab, setActiveTab] = useState(initialManufacturer);
+  const isInitialMount = useRef(true);
+  const lastSelectedMemoryId = useRef(selectedMemoryId);
 
-  // Update active tab when selectedMemoryId or defaultManufacturer changes
+  // Only update active tab on initial mount OR when a different preset is selected
+  // Don't update when user manually clicks tabs
   useEffect(() => {
-    const preset = memoryPresets.find((p) => p.id === selectedMemoryId);
-    const manufacturer = preset?.manufacturer || defaultManufacturer || manufacturers[0];
-    setActiveTab(manufacturer);
+    if (isInitialMount.current) {
+      // Initial mount: set tab based on selected preset
+      const preset = memoryPresets.find((p) => p.id === selectedMemoryId);
+      const manufacturer = preset?.manufacturer || defaultManufacturer || manufacturers[0];
+      setActiveTab(manufacturer);
+      isInitialMount.current = false;
+      lastSelectedMemoryId.current = selectedMemoryId;
+    } else if (lastSelectedMemoryId.current !== selectedMemoryId) {
+      // Preset changed (user selected a different preset): update tab to that preset's manufacturer
+      const preset = memoryPresets.find((p) => p.id === selectedMemoryId);
+      if (preset) {
+        setActiveTab(preset.manufacturer);
+        lastSelectedMemoryId.current = selectedMemoryId;
+      }
+    }
   }, [selectedMemoryId, defaultManufacturer, manufacturers]);
 
   return (
