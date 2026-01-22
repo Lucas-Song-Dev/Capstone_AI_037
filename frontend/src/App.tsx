@@ -1,6 +1,4 @@
 import { useState } from 'react';
-import { Button, Container, Title, Select, Stack, Card, Text, Group, Badge, Progress, Box, Paper } from '@mantine/core';
-import { Cpu, Zap, BarChart3, Settings, Zap as ZapIcon } from 'lucide-react';
 import { computeCorePower, createDefaultWorkload } from './lib/ddr5Calculator';
 import { DDR5_PRESETS, PRESET_NAMES } from './lib/presets';
 import type { PowerResult } from './lib/types';
@@ -15,155 +13,108 @@ function App() {
 
     setIsCalculating(true);
 
-    // Simulate a brief calculation delay for better UX
+    // Simulate calculation time for better UX
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    const memspec = DDR5_PRESETS[selectedPreset];
-    const workload = createDefaultWorkload();
-    const result = computeCorePower(memspec, workload);
-    setPowerResult(result);
-    setIsCalculating(false);
+    try {
+      const memspec = DDR5_PRESETS[selectedPreset];
+      const workload = createDefaultWorkload();
+      const result = computeCorePower(memspec, workload);
+      setPowerResult(result);
+    } catch (error) {
+      console.error('Calculation error:', error);
+    } finally {
+      setIsCalculating(false);
+    }
   };
 
-  const handlePresetChange = (value: string | null) => {
-    if (value) setSelectedPreset(value);
-  };
-
-  const getPowerColor = (power: number) => {
-    if (power < 0.1) return 'green';
-    if (power < 0.5) return 'blue';
-    if (power < 1.0) return 'orange';
-    return 'red';
+  const handlePresetChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedPreset(event.target.value);
   };
 
   const formatPower = (power: number) => `${power.toFixed(4)} W`;
 
   return (
-    <Box style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: '2rem 0'
-    }}>
-      <Container size="lg">
+    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-blue-800 p-8">
+      <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <Paper shadow="xl" radius="lg" p="xl" mb="xl" style={{ background: 'rgba(255, 255, 255, 0.95)' }}>
-          <Group justify="center" mb="md">
-            <Cpu size={48} color="#1c7ed6" />
-          </Group>
-          <Title order={1} ta="center" c="blue.8" mb="sm">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-white mb-4">
             DDR5 Power Calculator
-          </Title>
-          <Text ta="center" c="dimmed" size="lg">
+          </h1>
+          <p className="text-blue-100 text-lg">
             Analyze DDR5 memory power consumption with JEDEC-compliant calculations
-          </Text>
-          <Group justify="center" mt="md">
-            <Badge color="blue" variant="light" size="lg">
-              Real-time Analysis
-            </Badge>
-            <Badge color="green" variant="light" size="lg">
-              JEDEC Compliant
-            </Badge>
-            <Badge color="orange" variant="light" size="lg">
-              Browser-based
-            </Badge>
-          </Group>
-        </Paper>
+          </p>
+        </div>
 
-        <Stack gap="xl">
-          {/* Configuration Card */}
-          <Card shadow="xl" padding="xl" radius="lg" style={{ background: 'rgba(255, 255, 255, 0.95)' }}>
-            <Group mb="lg">
-              <Settings size={24} color="#1c7ed6" />
-              <Title order={2} c="blue.8">Memory Configuration</Title>
-            </Group>
+        {/* Configuration */}
+        <div className="glass-card rounded-lg p-6 mb-8">
+          <h2 className="text-2xl font-semibold text-white mb-4">Memory Configuration</h2>
 
-            <Stack gap="md">
-              <Select
-                label="DDR5 Memory Specification"
-                placeholder="Choose a memory configuration"
-                description="Select from pre-configured manufacturer specifications"
-                data={Object.entries(PRESET_NAMES).map(([key, name]) => ({
-                  value: key,
-                  label: name
-                }))}
-                value={selectedPreset}
-                onChange={handlePresetChange}
-                size="lg"
-                radius="md"
-                leftSection={<Cpu size={18} />}
-              />
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-blue-100 mb-2">
+              DDR5 Memory Specification
+            </label>
+            <select
+              value={selectedPreset}
+              onChange={handlePresetChange}
+              className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-md text-white"
+            >
+              {Object.entries(PRESET_NAMES).map(([key, name]) => (
+                <option key={key} value={key} className="bg-gray-800">
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-              <Button
-                onClick={handleCalculate}
-                size="xl"
-                fullWidth
-                leftSection={<Zap size={20} />}
-                loading={isCalculating}
-                loaderProps={{ type: 'dots' }}
-                gradient={{ from: 'blue', to: 'cyan' }}
-                style={{ height: 60 }}
-              >
-                {isCalculating ? 'Calculating...' : 'Calculate Power Consumption'}
-              </Button>
-            </Stack>
-          </Card>
+          <button
+            onClick={handleCalculate}
+            disabled={isCalculating}
+            className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-md transition-all duration-200 disabled:opacity-50"
+          >
+            {isCalculating ? 'Calculating...' : 'Calculate Power Consumption'}
+          </button>
+        </div>
 
-          {/* Results Card */}
-          {powerResult && (
-            <Card shadow="xl" padding="xl" radius="lg" style={{ background: 'rgba(255, 255, 255, 0.95)' }}>
-              <Group mb="lg">
-                <BarChart3 size={24} color="#1c7ed6" />
-                <Title order={2} c="blue.8">Power Analysis Results</Title>
-              </Group>
+        {/* Results */}
+        {powerResult && (
+          <div className="glass-card rounded-lg p-6">
+            <h2 className="text-2xl font-semibold text-white mb-6">Power Analysis Results</h2>
 
-              {/* Main Power Display */}
-              <Paper shadow="sm" p="xl" radius="md" mb="xl" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
-                <Group justify="center">
-                  <div style={{ textAlign: 'center' }}>
-                    <ZapIcon size={48} style={{ marginBottom: '1rem' }} />
-                    <Title order={1} style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>
-                      {formatPower(powerResult.P_total_core)}
-                    </Title>
-                    <Text size="xl" fw={500}>Total Core Power</Text>
-                  </div>
-                </Group>
-              </Paper>
+            {/* Main Power Display */}
+            <div className="bg-gradient-to-r from-blue-500/20 to-purple-600/20 rounded-lg p-6 mb-6 border border-white/10">
+              <div className="text-center">
+                <div className="text-5xl font-bold text-white mb-2">
+                  {formatPower(powerResult.P_total_core)}
+                </div>
+                <div className="text-blue-200 text-lg">Total Core Power</div>
+              </div>
+            </div>
 
-              {/* Power Breakdown */}
-              <Stack gap="md">
-                <Title order={3} c="blue.8" mb="md">Power Breakdown</Title>
-
-                <Group grow>
-                  <Paper shadow="sm" p="md" radius="md" style={{ border: '1px solid #e9ecef' }}>
-                    <Text size="sm" c="dimmed" mb="xs">VDD Power</Text>
-                    <Text size="lg" fw={600} c={getPowerColor(powerResult.P_VDD_core)}>
+            {/* Power Breakdown */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-lg font-medium text-white mb-4">Power Distribution</h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-3 bg-white/5 rounded-md">
+                    <span className="text-blue-100 font-medium">VDD Power:</span>
+                    <span className="font-mono font-semibold text-blue-400">
                       {formatPower(powerResult.P_VDD_core)}
-                    </Text>
-                    <Progress
-                      value={(powerResult.P_VDD_core / powerResult.P_total_core) * 100}
-                      color="blue"
-                      size="sm"
-                      mt="xs"
-                    />
-                  </Paper>
-
-                  <Paper shadow="sm" p="md" radius="md" style={{ border: '1px solid #e9ecef' }}>
-                    <Text size="sm" c="dimmed" mb="xs">VPP Power</Text>
-                    <Text size="lg" fw={600} c={getPowerColor(powerResult.P_VPP_core)}>
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-white/5 rounded-md">
+                    <span className="text-blue-100 font-medium">VPP Power:</span>
+                    <span className="font-mono font-semibold text-purple-400">
                       {formatPower(powerResult.P_VPP_core)}
-                    </Text>
-                    <Progress
-                      value={(powerResult.P_VPP_core / powerResult.P_total_core) * 100}
-                      color="orange"
-                      size="sm"
-                      mt="xs"
-                    />
-                  </Paper>
-                </Group>
+                    </span>
+                  </div>
+                </div>
+              </div>
 
-                <Title order={4} c="blue.7" mt="lg" mb="md">Detailed Components</Title>
-
-                <Stack gap="sm">
+              <div>
+                <h3 className="text-lg font-medium text-white mb-4">Component Breakdown</h3>
+                <div className="space-y-2">
                   {[
                     { label: 'Precharge Standby', value: powerResult.P_PRE_STBY_core },
                     { label: 'Active Standby', value: powerResult.P_ACT_STBY_core },
@@ -172,27 +123,20 @@ function App() {
                     { label: 'Refresh Power', value: powerResult.P_REF_core },
                     { label: 'Activate/Precharge', value: powerResult.P_ACT_PRE_core },
                   ].map((item, index) => (
-                    <Group key={index} justify="space-between" style={{ padding: '0.5rem', borderRadius: '4px', background: index % 2 === 0 ? '#f8f9fa' : 'transparent' }}>
-                      <Text fw={500}>{item.label}:</Text>
-                      <Text c={getPowerColor(item.value)} fw={600}>
+                    <div key={item.label} className={`flex justify-between items-center py-2 px-3 rounded-md ${index % 2 === 0 ? 'bg-white/5' : 'bg-white/10'}`}>
+                      <span className="text-blue-100 text-sm">{item.label}:</span>
+                      <span className="font-mono text-sm text-white">
                         {formatPower(item.value)}
-                      </Text>
-                    </Group>
+                      </span>
+                    </div>
                   ))}
-                </Stack>
-              </Stack>
-            </Card>
-          )}
-        </Stack>
-
-        {/* Footer */}
-        <Paper shadow="sm" p="md" radius="md" mt="xl" style={{ background: 'rgba(255, 255, 255, 0.9)', textAlign: 'center' }}>
-          <Text size="sm" c="dimmed">
-            DDR5 Power Calculator - JEDEC-compliant power analysis for modern memory systems
-          </Text>
-        </Paper>
-      </Container>
-    </Box>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
