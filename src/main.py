@@ -1,13 +1,25 @@
-from ddr5 import ddr5
+from ddr5 import DDR5
+from interface_model import DDR5InterfacePowerModel
+from core_model import DDR5CorePowerModel
+
 from visualizer import plot_power
 
 def main():
-    memspec = "../workloads/micron_16gb_ddr5_6400_x8_spec.json"
-    workload = "../workloads/workload.json"
-    model = ddr5.from_json_files(memspec, workload)
-    result = model.compute_corepower()
-    model.report_power()
-    plot_power(result)
+    memspec_path = "../workloads/micron_16gb_ddr5_6400_x8_spec.json"
+    workload_path = "../workloads/workload.json"
+    core_model = DDR5CorePowerModel()
+    interface_model = DDR5InterfacePowerModel()
+
+    sys = DDR5.from_json_files(
+        memspec_path,
+        workload_path,
+        core_model=core_model,
+        interface_model=interface_model,
+    )
+
+    sys.compute_all()
+    sys.report_power()
+
 
 
 if __name__ == "__main__":
