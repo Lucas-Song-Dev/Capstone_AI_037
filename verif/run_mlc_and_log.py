@@ -22,14 +22,19 @@ def run_mlc_test(workload_id=6, duration=30, buffer_size="128m"):
 
     # Constructing the command for Peak Injection Bandwidth
     # -d0: zero delay (maximum saturation)
+    # -e: do not modify prefetcher settings
+    # -r: random accesses to beat prefetchers
 
     cmd = [
+        "sudo",
         mlc_bin, 
         "--loaded_latency", 
         f"-W{workload_id}", 
         f"-t{duration}", 
         f"-b{buffer_size}",
-        "-d0"
+        "-d0",
+        "-e",
+        "-r"
     ]
 
     print("Running MLC command: " + " ".join(cmd))
