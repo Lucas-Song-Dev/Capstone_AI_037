@@ -14,7 +14,8 @@ import numpy as np
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from ddr5 import ddr5
+from ddr5 import DDR5
+from core_model import DDR5CorePowerModel
 from parser import load_memspec, load_workload
 
 
@@ -216,7 +217,8 @@ def test_runtime_performance(results):
         try:
             memspec = load_memspec(memspec_full)
             workload = load_workload(workload_full)
-            result = ddr5(memspec, workload).compute_corepower()
+            core_model = DDR5CorePowerModel()
+            result = DDR5(memspec, workload, core_model=core_model).compute_core()
             elapsed = time.time() - start_time
             
             print(f"  Execution time: {elapsed:.4f} seconds")
@@ -333,7 +335,8 @@ def test_input_format_validation(results):
             memspec = load_memspec(str(test_file))
             workload_path = Path(__file__).parent / ".." / "workloads" / "workload.json"
             workload = load_workload(str(workload_path))
-            result = ddr5(memspec, workload).compute_corepower()
+            core_model = DDR5CorePowerModel()
+            result = DDR5(memspec, workload, core_model=core_model).compute_core()
             
             # If we get here, the model accepted invalid input
             print(f"  [FAIL] Model did not reject invalid input")
@@ -450,7 +453,8 @@ def run_all_tests(empirical_data_path=None):
     try:
         memspec = load_memspec(memspec_path)
         workload = load_workload(workload_path)
-        model_output = ddr5(memspec, workload).compute_corepower()
+        core_model = DDR5CorePowerModel()
+        model_output = DDR5(memspec, workload, core_model=core_model).compute_core()
         
         print(f"\n[OK] Model executed successfully")
         print(f"\nModel Output:")
@@ -497,7 +501,8 @@ if __name__ == "__main__":
         
         memspec = load_memspec(memspec_path)
         workload = load_workload(workload_path)
-        model_output = ddr5(memspec, workload).compute_corepower()
+        core_model = DDR5CorePowerModel()
+        model_output = DDR5(memspec, workload, core_model=core_model).compute_core()
         
         baseline_dir = Path(__file__).parent / "baseline"
         baseline_dir.mkdir(parents=True, exist_ok=True)
