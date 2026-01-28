@@ -1,3 +1,4 @@
+from ddr5 import DDR5
 from dimm import DIMM
 from interface_model import DDR5InterfacePowerModel
 from core_model import DDR5CorePowerModel
@@ -21,7 +22,7 @@ def main():
     dimm.report_dimm_power()
 
     # Calculate just one DRAM chip
-    # sys = DDR5.from_json_files(
+    # sys = DDR5.load_spec(
     #     memspec_path,
     #     workload_path,
     #     core_model=core_model,

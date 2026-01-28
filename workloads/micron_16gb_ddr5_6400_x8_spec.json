@@ -6,14 +6,12 @@
       "width": 8,
       "nbrOfBanks": 32,
       "nbrOfBankGroups": 8,
+      "nbrOfRanks": 1,
       "nbrOfColumns": 1024,
       "nbrOfRows": 65536,
+      "nbrOfDevices": 4,
       "burstLength": 16,
       "dataRate": 2
-    },
-    "dimmspec": {
-        "nbrOfRanks": 1,
-        "nbrOfDevices": 4
     },
     "mempowerspec": {
       "notes": "Values extracted from Micron 16Gb DDR5 Rev D Datasheet (Table 8)",

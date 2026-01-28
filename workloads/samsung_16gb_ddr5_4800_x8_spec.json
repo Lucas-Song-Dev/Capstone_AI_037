@@ -7,15 +7,12 @@
       "width": 8,
       "nbrOfBanks": 32,
       "nbrOfBankGroups": 8,
+      "nbrOfRanks": 1,
       "nbrOfColumns": 1024,
       "nbrOfRows": 65536,
       "burstLength": 16,
       "dataRate": 2,
       "page_size_KB": 1
-    },
-    "dimmspec": {
-        "nbrOfRanks": 1,
-        "nbrOfDevices": 8
     },
     "mempowerspec": {
       "vdd": 1.1,

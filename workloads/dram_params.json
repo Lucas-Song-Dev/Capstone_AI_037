@@ -12,11 +12,9 @@
         "dataRate": 2,
         "nbrOfBankGroups": 2,
         "nbrOfBanks": 16,
-        "RefMode": 1
-    },
-    "dimmspec": {
         "nbrOfRanks": 1,
-        "nbrOfDevices": 8
+        "nbrOfDevices": 8,
+        "RefMode": 1
     },
     "mempowerspec": {
         "IDD0": 53.00,
