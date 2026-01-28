@@ -31,6 +31,11 @@ def trim_hwinfo_csv(input_path, output_path, keep_cols):
     for i, interval in enumerate(keep_cols):
         start_col, end_col = interval.split('-')
 
+        # cut from beginning to the first start_col
+        if (i == 0 and start_col != 'A'):
+            cut_end_idx = excel_column_to_index(start_col) - 1
+            cols_to_drop.extend(df.columns[0 : cut_end_idx + 1])
+
         # get the first column to cut (end_col + 1)
         cut_start_idx = excel_column_to_index(end_col) + 1
         if (i != len(keep_cols) - 1):
@@ -41,8 +46,7 @@ def trim_hwinfo_csv(input_path, output_path, keep_cols):
             # if last interval, cut until the end
             cut_end_idx = len(df.columns) - 1
 
-        cols_to_drop.extend(df.columns[cut_start_idx : cut_end_idx])
-        # print(f"[*] Dropping {len(cols_to_drop)} columns (from {cut_start_idx} to {cut_end_idx})...")
+        cols_to_drop.extend(df.columns[cut_start_idx : cut_end_idx + 1])
         
     print("cols to drop:", cols_to_drop)
 
