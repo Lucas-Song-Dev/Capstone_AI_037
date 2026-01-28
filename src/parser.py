@@ -16,6 +16,7 @@ class MemArchitectureSpec:
     nbrOfRanks: int
     nbrOfColumns: int
     nbrOfRows: int
+    nbrOfDevices: int
     burstLength: int
     dataRate: 2
 
@@ -132,6 +133,7 @@ def load_memspec(path: str) -> MemSpec:
             nbrOfRanks      = int(arch_raw["nbrOfRanks"]),
             nbrOfColumns    = int(arch_raw["nbrOfColumns"]),
             nbrOfRows       = int(arch_raw["nbrOfRows"]),
+            nbrOfDevices       = int(arch_raw["nbrOfDevices"]),
             burstLength     = int(arch_raw["burstLength"]),
             dataRate        = int(arch_raw["dataRate"]),
         )
