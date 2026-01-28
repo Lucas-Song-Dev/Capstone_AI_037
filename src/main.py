@@ -9,6 +9,5 @@ def main():
     model.report_power()
     plot_power(result)
 
-
 if __name__ == "__main__":
     main()
