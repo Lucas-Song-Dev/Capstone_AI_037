@@ -1,70 +1,63 @@
 from typing import Dict, Optional
-from parser import load_memspec, load_workload, MemSpec, Workload
+from parser import load_memspec, load_workload
+from collections import Counter
 
 from interface_model import DDR5InterfacePowerModel
 from core_model import DDR5CorePowerModel
+from ddr5 import DDR5
 
-
-class DDR5:
+class DIMM:
     def __init__(
         self,
         memspec,
         workload,
-        core_model=None,
-        interface_model=None,
+        dram_list
     ):
         self.memspec = memspec
         self.workload = workload
-        self.core_model = core_model
-        self.interface_model = interface_model
 
         self.corepower: Optional[Dict[str, float]] = None
         self.interfacepower: Optional[Dict[str, float]] = None
         self.totalpower: Optional[Dict[str, float]] = None
 
+        self.dram_list = dram_list
+
     @classmethod
-    def load_spec(cls, memspec_path: str, workload_path: str, core_model=None, interface_model=None):
+    def load_specs(cls, memspec_path: str, workload_path: str):
         memspec = load_memspec(memspec_path)
         workload = load_workload(workload_path)
-        return cls(memspec, workload, core_model=core_model, interface_model=interface_model)
+        dram_list = []
 
-    def compute_core(self) -> Dict[str, float]:
-        if self.core_model is None:
-            raise ValueError("core_model is None")
-        self.corepower = self.core_model.compute(self.memspec, self.workload)
-        return self.corepower
+        core_model = DDR5CorePowerModel()
+        interface_model = DDR5InterfacePowerModel()
 
-    def compute_interface(self) -> Dict[str, float]:
-        if self.interface_model is None:
-            raise ValueError("interface_model is None")
-        self.interfacepower = self.interface_model.compute(self.memspec, self.workload)
-        return self.interfacepower
+        for i in range(0, memspec.memarchitecturespec.nbrOfDevices):
+            dram = DDR5.load_spec(memspec_path, workload_path, core_model, interface_model)
+            dram_list.append(dram)
+            print(dram_list)
 
-    def compute_all(self) -> Dict[str, float]:
-        core = self.compute_core()
-        interface = self.compute_interface()
-
-        # Merge (namespace to avoid key collisions)
-        merged = {}
-        merged.update({f"core.{k}": v for k, v in core.items()})
-        merged.update({f"if.{k}": v for k, v in interface.items()})
-
-        # Optional totals if both models provide totals
-        core_total = core.get("P_total_core", 0.0)
-        if_total = interface.get("P_total_interface", 0.0)
-        merged["P_total_core"] = core_total
-        merged["P_total_interface"] = if_total
-        merged["P_total"] = core_total + if_total
-
-        self.totalpower = merged
-        
-        return merged
+        return cls(memspec, workload, dram_list)
     
-    def report_power(self):
+    def compute_all(self) -> Dict[str, float]:
+        if self.dram_list is not None:
+            for dram in self.dram_list:
+                # Counter allows dicts to be added together
+                self.corepower = dict(Counter(self.corepower) + Counter(dram.compute_core()))
+                self.interfacepower = dict(Counter(self.interfacepower) + Counter(dram.compute_interface()))
+                self.totalpower = dict(Counter(self.totalpower) + Counter(dram.compute_all()))
+        else:
+            raise ValueError("No DRAM devices")
+
+        return self.totalpower
+    
+    def report_dram_power(self, index):
+        self.dram_list[index].report_power()
+    
+    def report_dimm_power(self):
         if self.corepower is None or self.interfacepower is None:
             raise RuntimeError("Must call compute_all() before report_power()")
 
-        print("\n================ DDR5 POWER REPORT ================\n")
+        print("\n================ DIMM POWER REPORT ================\n")
 
         # ---- MemSpec summary ----
         arch = self.memspec.memarchitecturespec
@@ -73,7 +66,7 @@ class DDR5:
         print(f"Device width: x{arch.width}")
         print(f"Banks: {arch.nbrOfBanks}  |  Bank Groups: {arch.nbrOfBankGroups}")
         print(f"Rows: {arch.nbrOfRows}  |  Columns: {arch.nbrOfColumns}")
-        print()
+        print(f"Ranks: {arch.nbrOfRanks}  |  # of Chips: {arch.nbrOfDevices}")
 
         # ---- Core power ----
         print("---- Core Power Breakdown (W) ----")

@@ -9,6 +9,7 @@
       "nbrOfRanks": 1,
       "nbrOfColumns": 1024,
       "nbrOfRows": 65536,
+      "nbrOfDevices": 4,
       "burstLength": 16,
       "dataRate": 2
     },

@@ -107,13 +107,16 @@ def compare_model_outputs():
     
     # Run model to get current output
     sys.path.insert(0, 'src')
-    from main import ddr5_core_power_model
+    from ddr5 import DDR5
+    from core_model import DDR5CorePowerModel
     from parser import load_memspec, load_workload
     
     try:
         memspec = load_memspec("workloads/micron_16gb_ddr5_6400_x8_spec.json")
         workload = load_workload("workloads/workload.json")
-        current_output = ddr5_core_power_model(memspec, workload)
+        core_model = DDR5CorePowerModel()
+        ddr5_instance = DDR5(memspec, workload, core_model=core_model)
+        current_output = ddr5_instance.compute_core()
     except Exception as e:
         print(f"\n[ERROR] Failed to run model: {e}")
         return False

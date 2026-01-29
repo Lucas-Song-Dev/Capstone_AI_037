@@ -22,6 +22,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+/frontend/node_modules/
 
 # Jupyter Notebook
 .ipynb_checkpoints
