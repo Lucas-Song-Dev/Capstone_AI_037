@@ -85,17 +85,17 @@ def analyze_system_utilization(ram_mt_s, channels=2):
     rw_bw = run_mlc_test(workload_id=5, duration=20)
     if rw_bw:
         util = (rw_bw / theo_max) * 100
-        print(f"READ  Utilization: {util:.2f}% ({rw_bw:,.2f} MB/s)")
-        print(f"--> Use this % as input RDsch_percent in workload.json.")
+        print(f"Read Utilization: {util:.2f}% ({rw_bw:,.2f} MB/s)")
+        print(f"--> Use this % as input RDsch_percent and WRsch_percent in workload.json.")
 
-    time.sleep(5) # Brief cool down
+    # time.sleep(5) # Brief cool down
 
     # Test Writes (I_DD4W)
-    w_bw = run_mlc_test(workload_id=6, duration=20)
-    if w_bw:
-        util = (w_bw / theo_max) * 100
-        print(f"WRITE Utilization: {util:.2f}% ({w_bw:,.2f} MB/s)")
-        print(f"--> Use this % as input WRsch_percent in workload.json.")
+    # w_bw = run_mlc_test(workload_id=6, duration=20)
+    # if w_bw:
+    #     util = (w_bw / theo_max) * 100
+    #     print(f"WRITE Utilization: {util:.2f}% ({w_bw:,.2f} MB/s)")
+    #     print(f"--> Use this % as input WRsch_percent in workload.json.")
 
 if __name__ == "__main__":
     print("Please start HWInfo logging now (shortcut: Ctrl+Shift+L).")
