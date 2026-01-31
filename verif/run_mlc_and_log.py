@@ -5,11 +5,11 @@ import time
 import keyboard
 import os
 
-def run_mlc_test(workload_id=6, duration=30, buffer_size="128m"):
+def run_mlc_test(workload_id=5, duration=30, buffer_size="128m"):
     """
     Triggers Intel MLC and returns the bandwidth in MB/s.
-    workload_id: 2 (Writes), 6 (Reads), 5 (1:1 Mix)
-    duration: Seconds to run (allow HWInfo to stabilize)
+    workload_id: 6 (only writes), 5 (1:1 Mix of reads and writes)
+    duration: Seconds to run (allow HWiNFO to stabilize)
     """
     
     # Path to mlc executable
@@ -20,7 +20,6 @@ def run_mlc_test(workload_id=6, duration=30, buffer_size="128m"):
     
     mlc_bin = os.path.join(mlc_path, mlc_bin)
 
-    # Constructing the command for Peak Injection Bandwidth
     # -d0: zero delay (maximum saturation)
     # -e: do not modify prefetcher settings
     # -r: random accesses to beat prefetchers
@@ -82,20 +81,20 @@ def analyze_system_utilization(ram_mt_s, channels=2):
     print(f"Theoretical Max Bandwidth: {theo_max:,.2f} MB/s")
     print("-" * 50)
 
-    # Test Reads (I_DD4R)
-    read_bw = run_mlc_test(workload_id=6, duration=20)
-    if read_bw:
-        util = (read_bw / theo_max) * 100
-        print(f"READ  Utilization: {util:.2f}% ({read_bw:,.2f} MB/s)")
+    # Test reads and writes
+    rw_bw = run_mlc_test(workload_id=5, duration=20)
+    if rw_bw:
+        util = (rw_bw / theo_max) * 100
+        print(f"READ  Utilization: {util:.2f}% ({rw_bw:,.2f} MB/s)")
         print(f"--> Use this % as input RDsch_percent in workload.json.")
 
     time.sleep(5) # Brief cool down
 
     # Test Writes (I_DD4W)
-    write_bw = run_mlc_test(workload_id=2, duration=20)
-    if write_bw:
-        util = (write_bw / theo_max) * 100
-        print(f"WRITE Utilization: {util:.2f}% ({write_bw:,.2f} MB/s)")
+    w_bw = run_mlc_test(workload_id=6, duration=20)
+    if w_bw:
+        util = (w_bw / theo_max) * 100
+        print(f"WRITE Utilization: {util:.2f}% ({w_bw:,.2f} MB/s)")
         print(f"--> Use this % as input WRsch_percent in workload.json.")
 
 if __name__ == "__main__":
