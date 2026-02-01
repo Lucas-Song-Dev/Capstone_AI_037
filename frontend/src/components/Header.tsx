@@ -1,3 +1,5 @@
+'use client';
+
 import { MemoryStick, Github, Info, Settings, Zap, MemoryStick as DIMMIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -5,12 +7,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useNavigate, useLocation } from 'react-router-dom';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 export function Header() {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const pathname = usePathname();
 
   const navItems = [
     { path: '/configuration', label: 'Configuration', icon: Settings },
@@ -22,7 +24,7 @@ export function Header() {
     <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3">
             <div className="relative">
               <MemoryStick className="w-7 h-7 text-primary" />
               <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-accent rounded-full animate-pulse-glow" />
@@ -35,27 +37,29 @@ export function Header() {
                 JEDEC-compliant power modeling
               </p>
             </div>
-          </div>
+          </Link>
 
           <div className="flex items-center gap-2">
             {/* Navigation */}
             <nav className="hidden md:flex items-center gap-1 mr-4">
               {navItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = location.pathname === item.path;
+                const isActive = pathname === item.path;
                 return (
                   <Button
                     key={item.path}
                     variant={isActive ? 'secondary' : 'ghost'}
                     size="sm"
-                    onClick={() => navigate(item.path)}
+                    asChild
                     className={cn(
                       'h-8 px-3 text-xs',
                       isActive && 'bg-primary/10 text-primary'
                     )}
                   >
-                    <Icon className="w-3.5 h-3.5 mr-1.5" />
-                    {item.label}
+                    <Link href={item.path}>
+                      <Icon className="w-3.5 h-3.5 mr-1.5" />
+                      {item.label}
+                    </Link>
                   </Button>
                 );
               })}
