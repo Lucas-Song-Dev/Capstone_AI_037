@@ -1,9 +1,8 @@
 {
-  "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "frontend/.next",
-  "installCommand": "cd frontend && npm install",
+  "buildCommand": "npm install && npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
   "framework": "nextjs",
-  "rootDirectory": "frontend",
   "functions": {
     "../backend/src/**/*.py": {
       "runtime": "python3.9"
