@@ -25,8 +25,8 @@ jobs:
       with:
         node-version: '18'
         # Disable cache to avoid issues with optional dependencies
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
+        # cache: 'npm'
+        # cache-dependency-path: frontend/package-lock.json
     
     - name: Install frontend dependencies
       run: |
@@ -34,7 +34,9 @@ jobs:
         # Remove node_modules and package-lock.json to ensure clean install
         # This fixes the @rollup/rollup-linux-x64-gnu optional dependency issue
         rm -rf node_modules package-lock.json
-        npm install --include=optional
+        npm install
+        # Explicitly install rollup optional dependencies for Linux
+        npm install @rollup/rollup-linux-x64-gnu --save-optional || true
     
     - name: Run frontend unit tests
       run: |
