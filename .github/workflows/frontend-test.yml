@@ -31,12 +31,13 @@ jobs:
     - name: Install frontend dependencies
       run: |
         cd frontend
-        # Remove node_modules and package-lock.json to ensure clean install
-        # This fixes the @rollup/rollup-linux-x64-gnu optional dependency issue
-        rm -rf node_modules package-lock.json
+        # Remove only node_modules, keep package-lock.json for reproducible builds
+        rm -rf node_modules
+        # Install dependencies
         npm install
-        # Explicitly install rollup optional dependencies for Linux
-        npm install @rollup/rollup-linux-x64-gnu --save-optional || true
+        # Force install the Rollup Linux optional dependency
+        # This is a workaround for npm bug with optional dependencies
+        npm install @rollup/rollup-linux-x64-gnu --force || npm install @rollup/rollup-linux-x64-gnu --no-save || true
     
     - name: Run frontend unit tests
       run: |
