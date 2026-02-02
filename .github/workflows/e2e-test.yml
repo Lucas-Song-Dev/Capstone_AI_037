@@ -54,11 +54,14 @@ jobs:
     - name: Install frontend dependencies
       run: |
         cd frontend
+        # Clear any cached build artifacts
+        rm -rf .next node_modules
         npm install
     
     - name: Build frontend
       run: |
         cd frontend
+        # Ensure clean build without cache
         npm run build
     
     - name: Run e2e tests
