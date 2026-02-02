@@ -3,15 +3,10 @@
   "outputDirectory": "frontend/.next",
   "installCommand": "cd frontend && npm install",
   "framework": "nextjs",
-  "functions": {
-    "backend/src/**/*.py": {
-      "runtime": "python3.9"
-    }
-  },
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/backend/src/index.py"
+      "destination": "/api/index"
     }
   ]
 }
