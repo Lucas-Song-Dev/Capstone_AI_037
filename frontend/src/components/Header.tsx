@@ -59,23 +59,33 @@ export function Header() {
                     )}
                   >
                     <Link href={item.path}>
-                    <Icon className="w-3.5 h-3.5 mr-1.5" />
-                    {item.label}
+                      <Icon className="w-3.5 h-3.5 mr-1.5" />
+                      {item.label}
                     </Link>
                   </Button>
                 );
               })}
             </nav>
 
-            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-              <Link href="/sources" aria-label="View Sources">
-                  <Info className="w-4 h-4" />
-              </Link>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                  <Link href="/sources" aria-label="View Sources">
+                    <Info className="w-4 h-4" />
+                  </Link>
                 </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-xs">
+                <p className="text-sm">
+                  DDR5 power calculator based on JEDEC specifications.
+                  Supports IDD/IPP current measurements and workload modeling.
+                </p>
+              </TooltipContent>
+            </Tooltip>
             
             <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
               <a 
-                href="https://github.com/Lucas/Capstone_AI_037" 
+                href="https://github.com/Lucas-Song-Dev/Capstone_AI_037" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 aria-label="View on GitHub"

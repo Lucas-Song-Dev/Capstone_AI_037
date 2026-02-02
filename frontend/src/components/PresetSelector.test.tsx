@@ -72,4 +72,3 @@ describe('PresetSelector', () => {
     expect(selectedButton).toHaveClass('bg-accent');
   });
 });
-

@@ -1,4 +1,4 @@
-name: Frontend Dependencies Check
+name: Install Frontend Dependencies
 
 on:
   push:
@@ -12,7 +12,7 @@ on:
       - 'frontend/**'
 
 jobs:
-  check-frontend-dependencies:
+  install-frontend:
     runs-on: ubuntu-latest
 
     steps:
