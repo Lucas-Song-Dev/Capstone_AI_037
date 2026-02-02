@@ -1,13 +1,18 @@
-name: Install Frontend Dependencies
+name: Frontend Dependencies Check
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, fullstack ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/npm-install-frontend.yml'
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, master, fullstack ]
+    paths:
+      - 'frontend/**'
 
 jobs:
-  install-frontend:
+  check-frontend-dependencies:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,5 +26,9 @@ jobs:
         cache-dependency-path: frontend/package-lock.json
 
     - name: Install dependencies
-      run: npm install
+      run: npm ci
+      working-directory: frontend
+
+    - name: Verify installation
+      run: npm list --depth=0
       working-directory: frontend

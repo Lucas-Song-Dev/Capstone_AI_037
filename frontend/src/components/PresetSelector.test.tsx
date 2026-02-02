@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen } from '../../tests/unit/next-test-utils';
 import { PresetSelector } from './PresetSelector';
 import { memoryPresets, workloadPresets } from '@/lib/presets';
 

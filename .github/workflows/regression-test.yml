@@ -1,13 +1,18 @@
-name: DDR5 Power Model - Regression Test
+name: Core Package - Regression Test
 
 on:
   # Run on pull requests
   pull_request:
-    branches: [ main, master, develop, test ]
+    branches: [ main, master, develop, test, fullstack ]
+    paths:
+      - 'core/**'
+      - '.github/workflows/regression-test.yml'
   
   # Run on pushes to main/master to update baseline
   push:
-    branches: [ main, master ]
+    branches: [ main, master, fullstack ]
+    paths:
+      - 'core/**'
   
   # Allow manual trigger
   workflow_dispatch:
@@ -40,28 +45,29 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r core/requirements.txt
+        pip install pytest
         
     - name: Verify project structure
       run: |
         echo "Checking project structure..."
         ls -la
         echo ""
-        echo "Source files:"
-        ls -la src/ || echo "No src/ directory"
+        echo "Core source files:"
+        ls -la core/src/ || echo "No core/src/ directory"
         echo ""
         echo "Workload files:"
-        ls -la workloads/ || echo "No workloads/ directory"
+        ls -la core/workloads/ || echo "No core/workloads/ directory"
         echo ""
         echo "Verification files:"
-        ls -la verif/ || echo "No verif/ directory"
+        ls -la core/verif/ || echo "No core/verif/ directory"
     
     - name: Check if baseline exists
       id: check_baseline
       run: |
-        if [ -f "verif/baseline/power_output_baseline.json" ]; then
+        if [ -f "core/verif/baseline/power_output_baseline.json" ]; then
           echo "baseline_exists=true" >> $GITHUB_OUTPUT
-          echo "✓ Baseline found at verif/baseline/power_output_baseline.json"
+          echo "✓ Baseline found at core/verif/baseline/power_output_baseline.json"
         else
           echo "baseline_exists=false" >> $GITHUB_OUTPUT
           echo "⚠ No baseline found - will create on first run"
@@ -72,6 +78,7 @@ jobs:
       if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
       run: |
         echo "::group::Updating Power Model Baseline"
+        cd core
         python test_regression.py --save-baseline
         echo "::endgroup::"
     
@@ -80,6 +87,7 @@ jobs:
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.update_baseline == 'yes'
       run: |
         echo "::group::Updating Power Model Baseline"
+        cd core
         python test_regression.py --save-baseline
         echo "::endgroup::"
     
@@ -88,6 +96,7 @@ jobs:
       if: github.event_name == 'pull_request'
       run: |
         echo "::group::Running DDR5 Power Model Verification Suite"
+        cd core
         if [ "${{ steps.check_baseline.outputs.baseline_exists }}" = "true" ]; then
           echo "Running tests against existing baseline..."
           python test_regression.py
@@ -101,9 +110,9 @@ jobs:
     - name: Display baseline values
       if: always()
       run: |
-        if [ -f "verif/baseline/power_output_baseline.json" ]; then
+        if [ -f "core/verif/baseline/power_output_baseline.json" ]; then
           echo "Current Power Model Baseline:"
-          cat verif/baseline/power_output_baseline.json
+          cat core/verif/baseline/power_output_baseline.json
         fi
     
     - name: Upload test results as artifacts
@@ -112,8 +121,8 @@ jobs:
       with:
         name: power-model-test-results
         path: |
-          verif/baseline/
-          verif/test_inputs/
+          core/verif/baseline/
+          core/verif/test_inputs/
         retention-days: 30
     
     - name: Commit updated baseline (if on main/master)
@@ -123,7 +132,7 @@ jobs:
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add verif/baseline/
+        git add core/verif/baseline/
         git diff --staged --quiet || git commit -m "chore: update power model baseline [skip ci]"
         git push || echo "No changes to push"
     
@@ -139,7 +148,7 @@ jobs:
           
           try {
             // Read the power model baseline
-            const baseline = JSON.parse(fs.readFileSync('verif/baseline/power_output_baseline.json', 'utf8'));
+            const baseline = JSON.parse(fs.readFileSync('core/verif/baseline/power_output_baseline.json', 'utf8'));
             
             comment += '✅ **Test Status:** All verification tests passed\n\n';
             comment += '### Power Model Output:\n\n';
