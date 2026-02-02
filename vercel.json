@@ -1,9 +1,4 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": ".next",
-  "installCommand": "npm install",
-  "rootDirectory": "frontend",
-  "framework": "nextjs",
   "rewrites": [
     {
       "source": "/api/(.*)",
@@ -12,3 +7,4 @@
   ],
   "cleanUrls": true
 }
+
