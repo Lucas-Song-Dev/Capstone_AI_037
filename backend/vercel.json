@@ -1,7 +1,1 @@
-{
-  "functions": {
-    "src/*.py": {
-      "runtime": "python3.9"
-    }
-  }
-}
+{}

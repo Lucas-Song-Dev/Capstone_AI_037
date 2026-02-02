@@ -2,16 +2,5 @@
   "buildCommand": "npm install && npm run build",
   "outputDirectory": ".next",
   "installCommand": "npm install",
-  "framework": "nextjs",
-  "functions": {
-    "../../backend/src/**/*.py": {
-      "runtime": "python3.9"
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    }
-  ]
+  "framework": "nextjs"
 }
