@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { ConfigProvider, useConfig } from './ConfigContext';
 import { memoryPresets, defaultWorkload } from '@/lib/presets';
