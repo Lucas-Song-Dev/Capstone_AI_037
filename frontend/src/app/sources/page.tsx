@@ -136,7 +136,7 @@ export default function Sources() {
               <div className="space-y-2 text-sm">
                 <p className="font-medium">Academic Paper (APA Style):</p>
                 <p className="text-muted-foreground pl-4 border-l-2 border-primary/20">
-                  Steiner, L., Psota, T., Mörz, M., Christ, D., Jung, M., & Wehn, N. (2025). DRAMPower 5: An Open-Source Power Simulator for Current Generation DRAM Standards. <em>RAPIDO '25: Proceedings of the Rapid Simulation and Performance Evaluation for Design</em>, 8-16. https://doi.org/10.1145/3721848.3721850
+                  Steiner, L., Psota, T., Mörz, M., Christ, D., Jung, M., & Wehn, N. (2025). DRAMPower 5: An Open-Source Power Simulator for Current Generation DRAM Standards. <em>RAPIDO &apos;25: Proceedings of the Rapid Simulation and Performance Evaluation for Design</em>, 8-16. https://doi.org/10.1145/3721848.3721850
                 </p>
               </div>
               <div className="space-y-2 text-sm">
@@ -148,7 +148,7 @@ export default function Sources() {
               <div className="space-y-2 text-sm">
                 <p className="font-medium">White Paper:</p>
                 <p className="text-muted-foreground pl-4 border-l-2 border-primary/20">
-                  SK hynix & Intel. (2023). <em>SK hynix's DDR5 Key to Enabling Industry-Leading Performing Data Centers</em>. SK hynix Newsroom.
+                  SK hynix & Intel. (2023). <em>SK hynix&apos;s DDR5 Key to Enabling Industry-Leading Performing Data Centers</em>. SK hynix Newsroom.
                 </p>
               </div>
             </CardContent>

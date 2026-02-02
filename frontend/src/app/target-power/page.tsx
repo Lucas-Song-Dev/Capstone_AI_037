@@ -135,11 +135,11 @@ export default function TargetPower() {
                       <TooltipContent className="max-w-xs p-3 bg-popover border border-border shadow-lg">
                         <p className="text-sm">
                           <strong>What should we focus on when searching?</strong><br />
-                          This tells the tool what's most important to you. "Balanced" means 
+                          This tells the tool what&apos;s most important to you. &quot;Balanced&quot; means 
                           we care about both the chip power (Core) and the whole memory stick 
-                          power (DIMM) equally. "Core-Optimized" means we really want the chip 
-                          power to be perfect. "DIMM-Optimized" means we care most about the 
-                          total memory stick power. Like choosing what's most important when 
+                          power (DIMM) equally. &quot;Core-Optimized&quot; means we really want the chip 
+                          power to be perfect. &quot;DIMM-Optimized&quot; means we care most about the 
+                          total memory stick power. Like choosing what&apos;s most important when 
                           picking a car - speed, comfort, or both!
                         </p>
                       </TooltipContent>
@@ -175,7 +175,7 @@ export default function TargetPower() {
                         <TooltipContent className="max-w-xs p-3 bg-popover border border-border shadow-lg">
                           <p className="text-sm">
                             <strong>How much should we care about each part?</strong><br />
-                            When you pick "Balanced" profile, this slider lets you fine-tune 
+                            When you pick &quot;Balanced&quot; profile, this slider lets you fine-tune 
                             the balance. Core is the power used by the memory chip itself. 
                             DIMM is the power used by the whole memory stick (chip + extra parts). 
                             Moving the slider is like adjusting a seesaw - more to one side means 
@@ -217,8 +217,8 @@ export default function TargetPower() {
                         <strong>What power do you want the memory chip to use?</strong><br />
                         This is the power (in Watts) that you want one memory chip to use. 
                         The tool will search for memory that matches this power as closely 
-                        as possible. Think of it like telling a chef "I want a meal that 
-                        has exactly 500 calories" - they'll find the best recipe that matches!
+                        as possible.                         Think of it like telling a chef &quot;I want a meal that 
+                        has exactly 500 calories&quot; - they&apos;ll find the best recipe that matches!
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -246,11 +246,11 @@ export default function TargetPower() {
                     <TooltipContent className="max-w-xs p-3 bg-popover border border-border shadow-lg">
                       <p className="text-sm">
                         <strong>What power do you want the whole memory stick to use?</strong><br />
-                        This is optional! If you leave it empty, we'll only match the chip power. 
-                        But if you fill it in, we'll try to match both the chip power AND the 
+                        This is optional! If you leave it empty, we&apos;ll only match the chip power. 
+                        But if you fill it in, we&apos;ll try to match both the chip power AND the 
                         whole memory stick power. The DIMM power includes the chip plus extra 
-                        parts like connectors. It's like saying "I want the engine to use 100W 
-                        AND the whole car to use 150W" - more specific!
+                        parts like connectors. It&apos;s like saying &quot;I want the engine to use 100W 
+                        AND the whole car to use 150W&quot; - more specific!
                       </p>
                     </TooltipContent>
                   </Tooltip>
