@@ -1,171 +1,332 @@
 from dataclasses import dataclass
 from typing import Dict, Optional
 
-def solve_power(v: float, R: float) -> float:
-    return (v * v) / R
+# =========================================================
+# Assumptions and Modelling Scope
+# =========================================================
+#
+# This interface power model is a first-order, resistive-based
+# approximation intended for architectural and comparative
+# power analysis of DDR5 memory interfaces.
+#
+# Key assumptions:
+#
+# 1. Resistive I/O Model
+#    Each signal wire is modelled as a simple series path consisting
+#    of an output driver resistance (Ron) and a termination resistance
+#    (RTT). Transmission line effects such as reflections, impedance
+#    mismatch, and frequency-dependent losses are not modelled.
+#    Current I = VDDQ / (Ron + Rtt).
+#
+# 2. Pseudo Open Drain (POD) Signalling
+#    DDR5 I/O signalling is treated as POD-based. Power consumption
+#    is assumed to occur primarily when a signal is driven to the
+#    logical '0' level. This behaviour is approximated using a
+#    probability factor (prob_*_zero) to represent the fraction of
+#    time a wire is actively sinking current.
+#
+# 3. Termination and Driver Power Attribution
+#    - For write operations (Host drives, DRAM receives), power dissipation 
+#      is attributed to the receiver-side termination (DRAM ODT).
+#    - For read operations (DRAM drives, Host receives), power dissipation 
+#      is attributed to the transmitter-side output driver resistance (DRAM Ron).
+#    This separation allows precise estimation of heat generated on the DRAM die.
+#
+# 4. Differential Signalling Approximation
+#    Differential signals (CK, WCK, DQS) are modelled on a per-wire
+#    basis. Each wire is assumed to spend approximately 50% of time
+#    at logic low, represented using a toggle probability of 0.5.
+#    Correlation effects between differential pairs are not modelled.
+#
+# 5. Activity and Utilization Factors
+#    Signal activity is represented using average utilization and
+#    duty-cycle parameters (e.g., rd_duty, wr_duty, ca_util, cs_util).
+#    These parameters abstract detailed timing behaviour into
+#    steady-state averages suitable for system-level analysis.
+#
+# 6. Static Impedance Settings
+#    Driver and termination resistances (Ron, RTT) are assumed to be
+#    static and pre-calibrated (e.g., via ZQ calibration) and do not
+#    vary dynamically with voltage, temperature, or frequency.
+#    Values are sourced from JEDEC JESD79-5 Mode Registers (MR).
+#
+# 7. Scope Limitations
+#    This model does not attempt to be cycle-accurate. It is intended
+#    to support relative comparisons between memory configurations,
+#    workloads, and architectural trade-offs rather than absolute
+#    silicon-accurate power prediction.
+#
+# =========================================================
+
+# ==========================================
+# Core Physics Helpers
+# ==========================================
+
+def calc_power_drop_across_term(voltage: float, r_source: float, r_term: float) -> float:
+    """
+    Calculates power dissipated at the Termination Resistor (Receiver side).
+    Used for: DQ Write (DRAM side), CA (DRAM side), CK (DRAM side).
+    
+    Formula: P = I^2 * R_term
+    Where I = Voltage / (R_source + R_term)
+    """
+    if (r_source + r_term) == 0:
+        return 0.0
+    current = voltage / (r_source + r_term)
+    return (current ** 2) * r_term
+
+def calc_power_drop_across_driver(voltage: float, r_source: float, r_term: float) -> float:
+    """
+    Calculates power dissipated at the Output Driver (Transmitter side).
+    Used for: DQ Read (DRAM side driving data).
+    
+    Formula: P = I^2 * R_source
+    Where I = Voltage / (R_source + R_term)
+    """
+    if (r_source + r_term) == 0:
+        return 0.0
+    current = voltage / (r_source + r_term)
+    return (current ** 2) * r_source
+
+# ==========================================
+# Data Classes
+# ==========================================
 
 @dataclass
 class InterfacePowerInputs:
-    # Rails
-    vdd: float                      # core / CA / CK rail
-    vddq: float                     # IO rail for DQ/DQS/WCK
+    # --- Voltage Rails ---
+    vddq: float = 1.1               # DDR5 IO Voltage
 
-    # Topology
+    # --- Topology Info ---
     num_subchannels: int = 2        # DDR5 DIMM: typically 2 subchannels per channel
-    subchannel_width_bits: int = 32 # DDR5 subchannel data width (non-ECC)
+    device_width_bits: int = 8      # x8 devices
+    devices_per_rank: int = 8       # 8 chips for 64-bit width
+    num_ranks: int = 1
 
-    device_width_bits: int = 8      # x8 default
-    num_ranks: int = 1              # ranks per DIMM/channel
+    # --- Signal counts ---
+    # Source: JEDEC JESD308B (DDR5 UDIMM Common Standard) - Pin Assignments
+    # Standard UDIMMs define distinct CS pins (e.g., Pin 150 CS0_n_A, Pin 151 CS1_n_A) 
+    # to support up to 2 physical ranks per subchannel.
+    # Therefore, active CS lines typically equal the number of physical ranks.
+    num_cs: Optional[int] = None    
 
-    # Signal counts
-    num_ca: Optional[int] = None    # total CA lines (per channel)
-    num_cs: Optional[int] = None    # CS lines per channel (usually = num_ranks)
-
-    # Fractions of time / utilization (0..1)
-    rd_duty: float = 0.0
-    wr_duty: float = 0.0
-    ca_util: float = 0.15           # time CA is actively driven (time-based)
-    cs_util: float = 0.15           # time CA is actively driven (time-based)
-
-    # Toggle probabilities (0..1) — only use for dynamic/CV^2 f terms, not V^2/R termination
-    toggle_data: float = 0.50
-    toggle_ca: float = 0.50
-    toggle_clk: float = 0.50
-    toggle_dqs: float = 0.50
-
-    # Ohms (RTT: effective termination resistance)
-    r_ca: float = 80.0
-    r_cs: float = 80.0
-    r_ck: float = 50.0
-    r_dq: float = 80.0
-    r_dqs: float = 80.0
-    r_wck: float = 50.0
-    r_rdqs: float = 80.0
-
-
-class InterfacePowerModel:
-    """
-    DDR5 DRAM *interface* power model: calculate two things: static termination power and dynamic switching power
-
-    ***** PART 1 *****
-    It models static on die termination power and driver power (read on the controller side) on the following lines:
-    Power is found by P = V^2 / R * the number of pins * utility
-    V: either vddq or vdd
-    R: ODT resistance, detailed below
-    Utility: the percentage of time the bus is active
-
-    1. CA (Command/Address Bus)
-        Number: each 32-bit subchannel has 14 CA pins and 2 CS pins. Times 2 for 2 subchannels.
-        Resistance: ~80Ω parallel (pull-up/down to VDD/GND)
-        Voltage: VDD 
-        Activity: ~10-20% of bus bandwidth (only active during command phases)
-
-    2. CS (Chip Select)
-        Number: each 32-bit subchannel has 14 CA pins and 2 CS pins. Times 2 for 2 subchannels.
-        For one rank dimm(1Rx8), only cs0 toggles. For 2 ranks(2Rx8), both toggles.
-        Resistance: ~80-100Ω pull-up to VDD
-        Voltage: VDD
-        Activity: Pulsed during read/write operations (~6-8 out of 8 cycles when transaction active)
-        Duty cycle: ~10-15% bus utilization
-
-    3. CK (Clock)
-        Number: 1 pair for each subchannel.
-        Resistance: ~50Ω differential (series resistor on each line to virtual ground plane)
-        Voltage: VDD
-        Activity: 100% (always on when clock is running)
-
-    4. DQ (Data)
-        Number: the width of rank, 64 without ECC, 72 with ECC, 80 with RDIMM. 
-        Resistance: ~80Ω parallel (pull-up/down to VDDQ or mid-supply)
-        Voltage: VDDQ
-        Activity: RD% + WR% of workload
-        Power typical: 30-100 mW (depends on read/write activity)
-
-    5. DQS (Data Strobe)
-        Number: 1 dqs pair for every 8 DQ pins. 8x2 for 64 DQ pins.
-        Resistance: ~80Ω parallel (typically on controller side)
-        Voltage: VDDQ
-        Activity: Toggling at 50% during READ or WRITE
-        Power typical: 10-20 mW
+    # --- Impedance Settings (DDR5 Typical) ---
+    # Source: JEDEC JESD79-5 (DDR5 SDRAM)
     
-    6. DM (data mask)
-        Number: one DM pin for every 8 bits of data. 8 DM for 64 DIMM
+    # Host (CPU/MC) Driver Impedance
+    # Defined in MR5: RZQ/7 = 240/7 ≈ 34 ohm
+    r_on_host: float = 34.0
+    # Host (CPU/MC) Termination (for Reads)
+    r_tt_host: float = 40.0
+    
+    # DRAM Output Driver (for Reads) 
+    # Defined in MR5: RZQ/7 = 240/7 ≈ 34 ohm
+    r_on_dram: float = 34.0
+    
+    # DRAM Write Termination (Target ODT) 
+    # Defined in MR34: RZQ/5 = 48 ohm or RZQ/6 = 40 ohm
+    r_tt_dram_wr: float = 48.0      
+    
+    # DRAM CA/CS Termination - MR33
+    r_tt_ca: float = 80.0
+    # DRAM Clock Termination
+    r_tt_ck: float = 40.0
+
+    # --- Activity / Duty Cycles (0.0 to 1.0) ---
+    rd_duty: float = 0.0            # % of time reading
+    wr_duty: float = 0.0            # % of time writing
+    
+    # Utilization factors (Active time when CKE is high)
+    ca_util: float = 0.15           # Command bus utilization
+    cs_util: float = 0.05           # Chip Select utilization
+    ck_util: float = 1.00           # Clock is typically always running if CKE is High
+
+    # --- Signal Probabilities (0.0 to 1.0) ---
+    # Probability of signal being '0' (Low).
+    # Since DDR5 is POD (Pseudo Open Drain), power is only consumed when signal is Low.
+    # With DBI (Data Bus Inversion), '0' count is minimized, typically <= 0.5.
+    prob_data_zero: float = 0.5     # For random data
+    prob_cmd_zero: float = 0.5      # For random commands
+    prob_clock_toggle: float = 0.5  # Clocks are 50% duty cycle
+
+# ==========================================
+# Main Calculation Logic
+# ==========================================
+
+def calculate_interface_power(inputs: InterfacePowerInputs) -> Dict[str, float]:
+    """
+    Calculates interface power components for DDR5 based on JEDEC principles.
+    Returns power in Watts (W).
     """
 
-    def compute_termination(self, input: InterfacePowerInputs) -> Dict[str, float]:
-
-        ## find the number of device and the device needs termination
-        rank_bus_width_bits = input.num_subchannels * input.subchannel_width_bits
-        devices_per_rank = rank_bus_width_bits // input.device_width_bits
-        num_other_devices = devices_per_rank - 1
-
-        # Per-device signal counts
-        dq_bits_per_device = input.device_width_bits
-        # FIXME: not sure if should treat as 1 or 1 pair, because only 1 is active.
-        dqs_per_device = input.device_width_bits // 8 * 2 
-
-        # CA (Command/Address)
-        P_CA = input.num_ca * solve_power(input.vdd, input.r_ca) * input.ca_util
-
-        # CS (Chip Select)
-        P_CS = input.num_cs * solve_power(input.vdd, input.r_cs) * input.cs_util
-
-        # FIXME: not sure if should treat as 1 or 1 pair, because only 1 is active. Do I need 2 separate pair for 2 subchannel
-        # CK (Clock): 2 lines, always toggling when clock running.
-        P_CK = 2.0 * solve_power(input.vdd, input.r_ck)
-        # DQ (Data)
-        P_DQ_READ_target = dq_bits_per_device * solve_power(input.vddq, input.r_dq) * input.rd_duty
-        P_DQ_READ_others = dq_bits_per_device * num_other_devices * solve_power(input.vddq, input.r_dq) * input.rd_duty
-
-        # WRITE: all devices (including target) terminate/receive during write (simple model)
-        P_DQ_WRITE = dq_bits_per_device * devices_per_rank * solve_power(input.vddq, input.r_dq) * input.wr_duty
-
-        # DQS
-        P_DQS = dqs_per_device * solve_power(input.vddq, input.r_dqs) * (input.rd_duty + input.wr_duty)
-
-        P_total = (P_CA + P_CS + P_CK + P_DQ_READ_target + P_DQ_READ_others + P_DQ_WRITE + P_DQS)
-
-        return {
-            "devices_per_rank": float(devices_per_rank),
-            "num_other_devices": float(num_other_devices),
-            "dq_bits_per_device": float(dq_bits_per_device),
-            "dqs_per_device": float(dqs_per_device),
-
-            # Per-interface powers (W)
-            "P_CA": P_CA,
-            "P_CS": P_CS,
-            "P_CK": P_CK,
-            "P_DQ_READ_target": P_DQ_READ_target,
-            "P_DQ_READ_others": P_DQ_READ_others,
-            "P_DQ_WRITE_all": P_DQ_WRITE,
-            "P_DQS": P_DQS,
-
-            "P_total_interface": P_total,
-        }
+    # ---------------------------------------------------
+    # 1. Derive Pin Counts (per Sub-channel)
+    # ---------------------------------------------------
+    # DQ: Data lines (e.g., 32 bits per subchannel)
+    num_dq = 32 
     
-
-    '''
-    ***** PART 2 *****    
-    Dynamic power based on switching activity: toggling on transmission lines.
-
-    Formula: P = N * (C_total * V^2 * f * a)
-    N: number of pins
-    C: total input capacitance
-    f: signal clock freqency, some signals are sent at different data rate, like only on rising edge
-    a: activity factor, how often it actually toggles.
+    # DQS: Data Strobe (Differential pairs). 1 pair per byte (8 bits)
+    # x8 device needs 1 DQS pair. Total 4 pairs for 32 bits.
+    # 4 pairs * 2 wires = 8 pins
+    num_dqs = (num_dq // 8) * 2 
     
-    ***** Note on PMIC ***** 
-    In DDR5, the PMIC is on the DIMM chip, it takes 5V from mother board and step down to 1.1V required by the chip.
-
-    Total DIMM power = sum of all internal power(dram+interface+dimm) / PMIC efficiency. 
-    '''
-
-
-    def compute_dynamic(self, input: InterfacePowerInputs) -> Dict[str, float]:
-        return None
+    # CA: Command/Address. DDR5 is 14 pins (7 pins x 2 for DDR) or similar depending on mode.
+    # Assuming 14 pins per subchannel for simplicity.
+    num_ca = 14
     
-    def compute_all(self, input: InterfacePowerInputs) -> Dict[str, float]:
-        termination = self.compute_termination(input)
-        dynamic = self.compute_dynamic(input)
+    # CS: Chip Select. Default to num_ranks if not provided.
+    # Based on JESD308B logic where each rank has a dedicated CS pin.
+    if inputs.num_cs is None:
+        num_cs = inputs.num_ranks
+    else:
+        num_cs = inputs.num_cs
+    
+    # CK: System Clock (Differential). 1 pair per subchannel = 2 pins.
+    num_ck = 2
 
-        return termination
+    # WCK: Write Clock (DDR5 specific). Differential.
+    # Typically 1 pair per nibble or byte depending on frequency/mode.
+    # Assuming 1 pair per byte -> 4 pairs -> 8 pins.
+    num_wck = (num_dq // 8) * 2
+
+    # ---------------------------------------------------
+    # 2. Calculate Power Components
+    # ---------------------------------------------------
+
+    # --- A. DQ Write Power (Termination Power) ---
+    # Path: Host Driver -> PCB -> DRAM ODT (Heat in DRAM)
+    p_pin_dq_wr = calc_power_drop_across_term(inputs.vddq, inputs.r_on_host, inputs.r_tt_dram_wr)
+    # Logic: Power * DutyCycle * Prob(0) * PinCount
+    total_dq_write = (
+        p_pin_dq_wr 
+        * inputs.wr_duty 
+        * inputs.prob_data_zero 
+        * num_dq 
+        * inputs.num_subchannels
+    )
+
+    # --- B. DQ Read Power (Driver Power) ---
+    # Path: DRAM Driver -> PCB -> Host ODT (Heat in DRAM is from Driver Ron)
+    p_pin_dq_rd = calc_power_drop_across_driver(inputs.vddq, inputs.r_on_dram, inputs.r_tt_host)
+    total_dq_read = (
+        p_pin_dq_rd 
+        * inputs.rd_duty 
+        * inputs.prob_data_zero 
+        * num_dq 
+        * inputs.num_subchannels
+    )
+
+    # --- C. CA (Command/Address) Power ---
+    # Path: Host Driver -> DRAM ODT
+    p_pin_ca = calc_power_drop_across_term(inputs.vddq, inputs.r_on_host, inputs.r_tt_ca)
+    total_ca = (
+        p_pin_ca 
+        * inputs.ca_util 
+        * inputs.prob_cmd_zero 
+        * num_ca 
+        * inputs.num_subchannels
+    )
+
+    # --- D. CK (System Clock) Power ---
+    # Path: Host Driver -> DRAM ODT. Always running (unless Power Down).
+    # Differential signal: effectively 50% are '0' and 50% are '1' at any time.
+    p_pin_ck = calc_power_drop_across_term(inputs.vddq, inputs.r_on_host, inputs.r_tt_ck)
+    total_ck = (
+        p_pin_ck 
+        * inputs.ck_util 
+        * inputs.prob_clock_toggle 
+        * num_ck 
+        * inputs.num_subchannels
+    )
+
+    # --- E. WCK (Write Clock) Power ---
+    # DDR5 Specific. Active primarily during Write operations.
+    # Differential signal.
+    p_pin_wck = calc_power_drop_across_term(inputs.vddq, inputs.r_on_host, inputs.r_tt_ck) # Use CK Rtt for WCK
+    total_wck = (
+        p_pin_wck 
+        * inputs.wr_duty 
+        * inputs.prob_clock_toggle 
+        * num_wck 
+        * inputs.num_subchannels
+    )
+
+    # --- F. DQS (Data Strobe) Power ---
+    # Read: Driven by DRAM (Driver Power)
+    # Write: Driven by Host (Termination Power)
+    
+    # DQS Write Part
+    p_pin_dqs_wr = calc_power_drop_across_term(inputs.vddq, inputs.r_on_host, inputs.r_tt_dram_wr)
+    total_dqs_wr = (
+        p_pin_dqs_wr * inputs.wr_duty * inputs.prob_clock_toggle * num_dqs * inputs.num_subchannels
+    )
+    
+    # DQS Read Part
+    p_pin_dqs_rd = calc_power_drop_across_driver(inputs.vddq, inputs.r_on_dram, inputs.r_tt_host)
+    total_dqs_rd = (
+        p_pin_dqs_rd * inputs.rd_duty * inputs.prob_clock_toggle * num_dqs * inputs.num_subchannels
+    )
+
+    total_dqs = total_dqs_wr + total_dqs_rd
+
+    # --- G. CS (Chip Select) Power ---
+    # Low duty cycle, active low usually.
+    p_pin_cs = calc_power_drop_across_term(inputs.vddq, inputs.r_on_host, inputs.r_tt_ca)
+    total_cs = (
+        p_pin_cs 
+        * inputs.cs_util 
+        * inputs.prob_cmd_zero 
+        * num_cs 
+        * inputs.num_subchannels
+    )
+
+    # ---------------------------------------------------
+    # 3. Aggregation
+    # ---------------------------------------------------
+    total_power = (
+        total_dq_write + 
+        total_dq_read + 
+        total_ca + 
+        total_ck + 
+        total_wck + 
+        total_dqs + 
+        total_cs
+    )
+
+    return {
+        "P_DQ_WRITE": total_dq_write,
+        "P_DQ_READ": total_dq_read,
+        "P_CA": total_ca,
+        "P_CK": total_ck,
+        "P_WCK": total_wck,
+        "P_DQS": total_dqs,
+        "P_CS": total_cs,
+        "P_TOTAL_INTERFACE": total_power
+    }
+
+
+
+    # ***** PART 2 *****    
+    # Dynamic power based on switching activity: toggling on transmission lines.
+
+    # Formula: P = N * (C_total * V^2 * f * a)
+    # N: number of pins
+    # C: total input capacitance
+    # f: signal clock freqency, some signals are sent at different data rate, like only on rising edge
+    # a: activity factor, how often it actually toggles.
+    
+    # ***** Note on PMIC ***** 
+    # In DDR5, the PMIC is on the DIMM chip, it takes 5V from mother board and step down to 1.1V required by the chip.
+
+    # Total DIMM power = sum of all internal power(dram+interface+dimm) / PMIC efficiency. 
+    # '''
+
+
+    # def compute_dynamic(self, input: InterfacePowerInputs) -> Dict[str, float]:
+    #     return None
+    
+    # def compute_all(self, input: InterfacePowerInputs) -> Dict[str, float]:
+    #     termination = self.compute_termination(input)
+    #     dynamic = self.compute_dynamic(input)
+
+    #     return termination
