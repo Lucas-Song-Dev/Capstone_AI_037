@@ -5,10 +5,10 @@ import time
 import keyboard
 import os
 
-def run_mlc_test(mlc_path, workload_id=5, duration=30, buffer_size="128m"):
+def run_mlc_test(mlc_path, workload_argument="-W5", duration=30, buffer_size="128m"):
     """
     Triggers Intel MLC and returns the bandwidth in MB/s.
-    workload_id: 6 (only writes), 5 (1:1 Mix of reads and writes)
+    workload_argument: -W5 (1:1 Mix of reads and writes), -R (100% read traffic)
     duration: Seconds to run (allow HWiNFO to stabilize)
     """
     
@@ -16,21 +16,14 @@ def run_mlc_test(mlc_path, workload_id=5, duration=30, buffer_size="128m"):
     mlc_path = os.path.abspath(mlc_path)
 
     # -d0: zero delay (maximum saturation)
-    # -e: do not modify prefetcher settings
+    # -e: don't change prefetcher settings
     # -r: random accesses to beat prefetchers
 
     cmd = [
-        "sudo",
-        # mlc_bin,
-        mlc_path, 
-        "--loaded_latency", 
-        f"-W{workload_id}", 
-        f"-t{duration}", 
-        f"-b{buffer_size}",
-        "-d0",
-        "-e",
-        "-r"
+        "sudo", mlc_path, "--loaded_latency", f"-t{duration}", f"-b{buffer_size}", "-d0", "-e", "-r"
     ]
+
+    cmd.append(f"{workload_argument}")
 
     print("Running MLC command: " + " ".join(cmd))
     
@@ -78,11 +71,26 @@ def analyze_system_utilization(mlc_path, ram_mt_s, channels=2):
     print("-" * 50)
 
     # Test reads and writes
-    rw_bw = run_mlc_test(mlc_path=mlc_path, workload_id=5, duration=20)
+    rw_bw = run_mlc_test(mlc_path=mlc_path, workload_argument="-W5", duration=20)
     if rw_bw:
         util = (rw_bw / theo_max) * 100
-        print(f"Read Utilization: {util:.2f}% ({rw_bw:,.2f} MB/s)")
-        print(f"--> Use this % as input RDsch_percent and WRsch_percent in workload.json.")
+        print(f"RD/WR Bandwidth as percentage: {util:.2f}% ({rw_bw:,.2f} MB/s)")
+        print(f"--> Use this % as input RDsch_percent and/or WRsch_percent in workload.json.")
+
+    time.sleep(10) # wait before next test to allow HWiNFO to stabilize
+
+    r_bw = run_mlc_test(mlc_path=mlc_path, workload_argument="-R", duration=20)
+    if r_bw:
+        util = (r_bw / theo_max) * 100
+        print(f"RD Bandwidth as percentage: {util:.2f}% ({r_bw:,.2f} MB/s)")
+        print(f"--> Use this % as input RDsch_percent in workload.json, set WRsch_percent to 0.")
+
+    time.sleep(10) # wait before next test to allow HWiNFO to stabilize
+
+    # idle test, just run for 20 seconds with no stimulus
+    print("Running idle test for 20 seconds. Please do not interact with the system during this time.")
+    time.sleep(20)
+    print("Idle test complete. You can now interact with the system.")
 
 if __name__ == "__main__":
     import argparse
