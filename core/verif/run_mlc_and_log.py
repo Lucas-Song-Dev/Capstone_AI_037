@@ -32,34 +32,35 @@ def run_mlc_test(mlc_path, workload_argument="-W5", duration=30, buffer_size="12
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         output = result.stdout
 
-        # Regex to find the total bandwidth. 
-        # ^\s*00000    -> Start of line, optional whitespace, followed by '00000'
-        # \s+[\d\.]+   -> Whitespace followed by the latency number (e.g., 620.34)
-        # \s+          -> Whitespace separating latency and bandwidth
-        # ([\d\.]+)    -> Capturing group for the bandwidth number
-        pattern = r"00000\s+[\d\.]+\s+([\d\.]+)"
+
+
+        # Regex to find the latency and total bandwidth. 
+        # (00000)    -> Group 1: Matches literal 00000
+        # \s+        -> One or more whitespace characters
+        # ([\d.]+)   -> Group 2: One or more digits or decimal points
+        # \s+        -> More whitespace
+        # ([\d.]+)   -> Group 3: One or more digits or decimal points
+        pattern = r"(00000)\s+([\d.]+)\s+([\d.]+)"
 
         match = re.search(pattern, output)
 
         if match:
-            bandwidth = float(match.group(1))
+            latency = float(match.group(2))
+            bandwidth = float(match.group(3))
+            print(f"Extracted Latency: {latency} ns")
             print(f"Extracted Bandwidth: {bandwidth} MB/s")
-        else:
-            print("Bandwidth not found.")
-        
-        if match:
-            bandwidth_mbs = float(match.group(1))
-            return bandwidth_mbs
+
+            return latency, bandwidth
         else:
             print("Could not parse bandwidth. Output was:\n", output)
-            return None
+            return None, None
 
     except subprocess.CalledProcessError as e:
         print(f"Error: MLC failed. Did you run as Admin/Sudo?\n{e.stderr}")
-        return None
+        return None, None
     except FileNotFoundError:
         print(f"Error: {mlc_path} not found in path.")
-        return None
+        return None, None
 
 def get_ideal_max_bandwidth(mt_s, channels=2, bus_width_bits=64):
     # max bandwidth is MT/s * (bus width in bytes) * number of channels
@@ -71,7 +72,7 @@ def analyze_system_utilization(mlc_path, ram_mt_s, channels=2):
     print("-" * 50)
 
     # Test reads and writes
-    rw_bw = run_mlc_test(mlc_path=mlc_path, workload_argument="-W5", duration=20)
+    rw_latency, rw_bw = run_mlc_test(mlc_path=mlc_path, workload_argument="-W5", duration=20)
     if rw_bw:
         util = (rw_bw / theo_max) * 100
         print(f"RD/WR Bandwidth as percentage: {util:.2f}% ({rw_bw:,.2f} MB/s)")
@@ -79,7 +80,7 @@ def analyze_system_utilization(mlc_path, ram_mt_s, channels=2):
 
     time.sleep(10) # wait before next test to allow HWiNFO to stabilize
 
-    r_bw = run_mlc_test(mlc_path=mlc_path, workload_argument="-R", duration=20)
+    r_latency, r_bw = run_mlc_test(mlc_path=mlc_path, workload_argument="-R", duration=20)
     if r_bw:
         util = (r_bw / theo_max) * 100
         print(f"RD Bandwidth as percentage: {util:.2f}% ({r_bw:,.2f} MB/s)")
