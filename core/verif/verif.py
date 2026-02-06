@@ -439,7 +439,17 @@ def run_all_tests(empirical_data_path=None):
     print("=" * 70)
     print("DDR5 POWER MODEL VERIFICATION TEST SUITE")
     print("=" * 70)
-    
+
+    # generate files listing paths to all spec files and all workload files
+    # find all *spec.json files in workloads directory
+    workloads_dir = Path(os.path.dirname(__file__)).parent / "workloads"
+    test_inputs_dir = Path(os.path.dirname(__file__)) / "test_inputs"
+    spec_files = list(workloads_dir.glob("*spec.json"))
+
+    with open(test_inputs_dir / "memspec_paths.txt", 'w') as f:
+        for spec in spec_files:
+            f.write(str(spec.resolve()) + "\n")
+ 
     # Load default test configuration
     memspec_path = os.path.join(os.path.dirname(__file__), "..", 
                                  "workloads", "micron_16gb_ddr5_6400_x8_spec.json")
@@ -512,7 +522,7 @@ if __name__ == "__main__":
             json.dump(model_output, f, indent=2)
         
         print(f"[OK] Baseline updated: {baseline_path}\n")
-    
+
     # Run tests
     all_passed = run_all_tests(args.empirical_data)
     

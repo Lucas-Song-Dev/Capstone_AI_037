@@ -69,3 +69,6 @@ tests/e2e/.pytest_cache/
 
 # Vercel
 .vercel
+
+# Verif temp files
+core/verif/test_inputs/memspec_paths.txt
