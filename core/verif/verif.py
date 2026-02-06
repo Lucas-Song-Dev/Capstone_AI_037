@@ -10,10 +10,13 @@ import time
 import json
 from pathlib import Path
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
+from interface_model import DDR5InterfacePowerModel
+from dimm import DIMM
 from ddr5 import DDR5
 from core_model import DDR5CorePowerModel
 from parser import load_memspec, load_workload
@@ -61,14 +64,14 @@ class TestResults:
         return self.tests_failed == 0
 
 
-def load_empirical_data(csv_path):
+def load_empirical_data(csv_path, plot=False):
     """
     Load empirical power data from HWiNFO CSV output
     Returns: (time_array, power_array) in numpy arrays
     
     Processes HWiNFO CSV format:
     - Column 0: Timestamp
-    - Column 8: Memory Power (W) - typical location for DDR5 power
+    - Column 8: Memory Power (W) - column for "Total Power"
     """
     if not os.path.exists(csv_path):
         return None, None
@@ -80,8 +83,7 @@ def load_empirical_data(csv_path):
         with open(csv_path, 'r', encoding='utf-8') as f:
             reader = csv.reader(f)
             
-            # Skip header rows (typically first 2 rows in HWiNFO format)
-            next(reader, None)
+            # Skip header row
             next(reader, None)
             
             first_timestamp = None
@@ -92,8 +94,6 @@ def load_empirical_data(csv_path):
                 try:
                     # Parse timestamp (HWiNFO format: "DD/MM/YYYY HH:MM:SS.mmm")
                     timestamp_str = row[0].strip()
-                    # For simplicity, we'll use row number as relative time
-                    # In production, parse actual timestamp
                     
                     # Parse power value from column 8 (0-indexed)
                     power_str = row[8].strip()
@@ -103,14 +103,25 @@ def load_empirical_data(csv_path):
                         first_timestamp = 0
                         time_data.append(0.0)
                     else:
-                        # Increment time (assuming ~1 second per sample)
-                        time_data.append(len(time_data) * 1.0)
+                        # Increment time (HWiNFO samples every 2 seconds)
+                        time_data.append(len(time_data) * 2.0)
                     
                     power_data.append(power_w)
                     
                 except (ValueError, IndexError):
                     continue
         
+        if (plot):
+            # plot the data to verify it looks correct in a bar chart:
+            plt.figure(figsize=(10, 5))
+            plt.plot(time_data, power_data, label="Empirical Power (W)")
+            plt.xlabel("Time (s)")
+            plt.ylabel("Power (W)")
+            plt.title("Empirical Power Data from HWiNFO")
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+
         return np.array(time_data), np.array(power_data)
     
     except Exception as e:
@@ -131,15 +142,15 @@ def test_background_power_sensibility(results, model_output, empirical_data_path
     print("TEST: Background Power Sensibility (NF-01)")
     print("-" * 70)
     
-    model_background = model_output.get("P_PRE_STBY_core", 0.0)
-    model_total = model_output.get("P_total_core", 0.0)
+    model_background = model_output.get("core.P_PRE_STBY_core", 0.0)
+    model_total = model_output.get("core.P_total_core", 0.0)
     
     print(f"Model Background Power: {model_background:.4f} W")
     print(f"Model Total Power: {model_total:.4f} W")
     
     # If empirical data is provided, compare
     if empirical_data_path and os.path.exists(empirical_data_path):
-        time_data, power_data = load_empirical_data(empirical_data_path)
+        time_data, power_data = load_empirical_data(empirical_data_path, plot=True)
         
         if power_data is not None and len(power_data) > 0:
             min_empirical = np.min(power_data)
@@ -215,18 +226,20 @@ def test_runtime_performance(results):
         
         start_time = time.time()
         try:
-            memspec = load_memspec(memspec_full)
-            workload = load_workload(workload_full)
-            core_model = DDR5CorePowerModel()
-            result = DDR5(memspec, workload, core_model=core_model).compute_core()
+            dimm = DIMM.load_specs(
+                memspec_full,
+                workload_full
+            )
+
+            result = dimm.compute_all()
             elapsed = time.time() - start_time
             
             print(f"  Execution time: {elapsed:.4f} seconds")
             max_time = max(max_time, elapsed)
             
-            if elapsed > 10.0:
+            if elapsed > 1.0:
                 all_passed = False
-                print(f"  [FAIL] Exceeds 10 second limit!")
+                print(f"  [FAIL] Exceeds 1 second limit!")
             else:
                 print(f"  [OK] Within time limit")
                 
@@ -431,6 +444,10 @@ def test_output_regression(results, model_output, baseline_path):
         results.add_pass("F-02: Regression validation",
                         "All outputs match baseline within tolerance")
 
+# take a list of model outputs and compare against empirical data
+# this will be used for the 50/50 rw, 100 r, and idle tests all the same
+def test_total_power(results, model_output_list, empirical_data_path=None):
+    pass
 
 def run_all_tests(empirical_data_path=None):
     """Run complete test suite"""
@@ -461,10 +478,12 @@ def run_all_tests(empirical_data_path=None):
     print(f"  Workload: {os.path.basename(workload_path)}")
     
     try:
-        memspec = load_memspec(memspec_path)
-        workload = load_workload(workload_path)
-        core_model = DDR5CorePowerModel()
-        model_output = DDR5(memspec, workload, core_model=core_model).compute_core()
+        dimm = DIMM.load_specs(
+            memspec_path,
+            workload_path
+        )
+
+        model_output = dimm.compute_all()
         
         print(f"\n[OK] Model executed successfully")
         print(f"\nModel Output:")
@@ -509,10 +528,12 @@ if __name__ == "__main__":
         workload_path = os.path.join(os.path.dirname(__file__), "..",
                                       "workloads", "workload.json")
         
-        memspec = load_memspec(memspec_path)
-        workload = load_workload(workload_path)
-        core_model = DDR5CorePowerModel()
-        model_output = DDR5(memspec, workload, core_model=core_model).compute_core()
+        dimm = DIMM.load_specs(
+            memspec_path,
+            workload_path
+        )
+
+        model_output = dimm.compute_all()
         
         baseline_dir = Path(__file__).parent / "baseline"
         baseline_dir.mkdir(parents=True, exist_ok=True)
