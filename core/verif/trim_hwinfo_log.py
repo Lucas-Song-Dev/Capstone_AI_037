@@ -120,7 +120,7 @@ if __name__ == "__main__":
     trim_hwinfo_csv(
         input_path=args.i, 
         output_path=args.o,
-        keep_cols=args.keep_cols,
+        keep_cols=args.keep_cols if args.keep_cols else "B-B MF-NA",
         keep_rows=args.keep_rows
     )
     
