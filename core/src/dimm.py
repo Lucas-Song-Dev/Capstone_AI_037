@@ -33,7 +33,7 @@ class DIMM:
         for i in range(0, memspec.memarchitecturespec.nbrOfDevices):
             dram = DDR5.load_spec(memspec_path, workload_path, core_model, interface_model)
             dram_list.append(dram)
-            print(dram_list)
+            # print(dram_list)
 
         return cls(memspec, workload, dram_list)
     
