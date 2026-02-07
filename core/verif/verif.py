@@ -10,10 +10,13 @@ import time
 import json
 from pathlib import Path
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
+from interface_model import DDR5InterfacePowerModel
+from dimm import DIMM
 from ddr5 import DDR5
 from core_model import DDR5CorePowerModel
 from parser import load_memspec, load_workload
@@ -25,6 +28,7 @@ class TestResults:
         self.tests_passed = 0
         self.tests_failed = 0
         self.test_details = []
+        self.plot = False
     
     def add_pass(self, test_name, details=""):
         self.tests_passed += 1
@@ -61,14 +65,14 @@ class TestResults:
         return self.tests_failed == 0
 
 
-def load_empirical_data(csv_path):
+def load_empirical_data(csv_path, plot=False):
     """
     Load empirical power data from HWiNFO CSV output
     Returns: (time_array, power_array) in numpy arrays
     
     Processes HWiNFO CSV format:
     - Column 0: Timestamp
-    - Column 8: Memory Power (W) - typical location for DDR5 power
+    - Column 8: Memory Power (W) - column for "Total Power"
     """
     if not os.path.exists(csv_path):
         return None, None
@@ -80,8 +84,7 @@ def load_empirical_data(csv_path):
         with open(csv_path, 'r', encoding='utf-8') as f:
             reader = csv.reader(f)
             
-            # Skip header rows (typically first 2 rows in HWiNFO format)
-            next(reader, None)
+            # Skip header row
             next(reader, None)
             
             first_timestamp = None
@@ -92,8 +95,6 @@ def load_empirical_data(csv_path):
                 try:
                     # Parse timestamp (HWiNFO format: "DD/MM/YYYY HH:MM:SS.mmm")
                     timestamp_str = row[0].strip()
-                    # For simplicity, we'll use row number as relative time
-                    # In production, parse actual timestamp
                     
                     # Parse power value from column 8 (0-indexed)
                     power_str = row[8].strip()
@@ -103,14 +104,25 @@ def load_empirical_data(csv_path):
                         first_timestamp = 0
                         time_data.append(0.0)
                     else:
-                        # Increment time (assuming ~1 second per sample)
-                        time_data.append(len(time_data) * 1.0)
+                        # Increment time (HWiNFO samples every 2 seconds)
+                        time_data.append(len(time_data) * 2.0)
                     
                     power_data.append(power_w)
                     
                 except (ValueError, IndexError):
                     continue
         
+        if (plot):
+            # plot the data to verify it looks correct in a bar chart:
+            plt.figure(figsize=(10, 5))
+            plt.plot(time_data, power_data, label="Empirical Power (W)")
+            plt.xlabel("Time (s)")
+            plt.ylabel("Power (W)")
+            plt.title("Empirical Power Data from HWiNFO")
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+
         return np.array(time_data), np.array(power_data)
     
     except Exception as e:
@@ -118,7 +130,7 @@ def load_empirical_data(csv_path):
         return None, None
 
 
-def test_background_power_sensibility(results, model_output, empirical_data_path=None):
+def test_background_power_sensibility(results, model_output_map, empirical_data_path, testname):
     """
     Test NF-01: Background power sensibility test
     
@@ -126,62 +138,73 @@ def test_background_power_sensibility(results, model_output, empirical_data_path
     be greater than the model's background power output.
     
     This ensures the model provides at least a realistic baseline power estimate.
+
+    Parameters:
+    - results: TestResults object to record pass/fail
+    - model_output_map: Map from memspec name to model output dict, which includes "core.P_PRE_STBY_core" for background power
+    - empirical_data_path: Path to HWiNFO CSV file with empirical power measurements
+    - testname: Name of the test scenario for labeling
     """
     print("\n" + "-" * 70)
-    print("TEST: Background Power Sensibility (NF-01)")
+    print(f"TEST: Background Power Sensibility (NF-01) - {testname}")
     print("-" * 70)
-    
-    model_background = model_output.get("P_PRE_STBY_core", 0.0)
-    model_total = model_output.get("P_total_core", 0.0)
-    
-    print(f"Model Background Power: {model_background:.4f} W")
-    print(f"Model Total Power: {model_total:.4f} W")
-    
-    # If empirical data is provided, compare
-    if empirical_data_path and os.path.exists(empirical_data_path):
-        time_data, power_data = load_empirical_data(empirical_data_path)
-        
-        if power_data is not None and len(power_data) > 0:
-            min_empirical = np.min(power_data)
-            max_empirical = np.max(power_data)
-            mean_empirical = np.mean(power_data)
-            
-            print(f"\nEmpirical Data Statistics:")
-            print(f"  Min Power: {min_empirical:.4f} W")
-            print(f"  Max Power: {max_empirical:.4f} W")
-            print(f"  Mean Power: {mean_empirical:.4f} W")
-            
-            # Test: Model background should be <= minimum empirical power
-            # (Background is the baseline that's always present)
-            if model_background <= min_empirical:
-                results.add_pass(
-                    "NF-01: Background power sensibility",
-                    f"Model background ({model_background:.4f} W) <= empirical min ({min_empirical:.4f} W)"
-                )
-            else:
-                results.add_fail(
-                    "NF-01: Background power sensibility",
-                    f"Model background ({model_background:.4f} W) > empirical min ({min_empirical:.4f} W)"
-                )
-            
-            # Additional sanity check: Total power should be within reasonable range
-            if model_total >= min_empirical and model_total <= max_empirical * 1.5:
-                print(f"[OK] Model total power is within reasonable empirical range")
-            else:
-                print(f"[WARN] Model total power outside empirical range (may be acceptable)")
-        else:
-            print("[WARN] Could not parse empirical data")
-            results.add_pass("NF-01: Background power sensibility", 
-                           f"No empirical data - model output verified: {model_background:.4f} W")
-    else:
-        # No empirical data - just verify model produces reasonable output
-        if 0.01 <= model_background <= 10.0:  # Reasonable range for DDR5 background power
-            results.add_pass("NF-01: Background power sensibility",
-                           f"Model background power in reasonable range: {model_background:.4f} W")
-        else:
-            results.add_fail("NF-01: Background power sensibility",
-                           f"Model background power out of range: {model_background:.4f} W")
 
+    time_data, power_data = load_empirical_data(empirical_data_path)
+    
+    if power_data is not None and len(power_data) > 0:
+        min_empirical = np.min(power_data)
+        max_empirical = np.max(power_data)
+        mean_empirical = np.mean(power_data)
+        
+        print(f"\nEmpirical Data Statistics:")
+        print(f"  Min Power: {min_empirical:.4f} W")
+        print(f"  Max Power: {max_empirical:.4f} W")
+        print(f"  Mean Power: {mean_empirical:.4f} W")
+    else:
+        print("[WARN] Could not parse empirical data")
+        results.add_fail("NF-01: Background power sensibility", 
+                    f"No empirical data found!")
+        return
+    
+    memspec_names = []
+    background_powers = []
+    total_powers = []
+
+    for memspec_name, model_output in model_output_map.items():
+    
+        model_background = model_output.get("core.P_PRE_STBY_core", 0.0)
+        memspec_names.append(memspec_name)
+        background_powers.append(model_background)
+        model_total = model_output.get("core.P_total_core", 0.0)
+        total_powers.append(model_total)
+        
+        print(f"Model Background Power ({memspec_name}): {model_background:.4f} W")
+        print(f"Model Total Power ({memspec_name}): {model_total:.4f} W")
+        
+    # Test (a): Check empirical power is between min and max model background powers with some tolerance (since empirical data can be noisy and model is not expected to be exact)
+    if (mean_empirical >= np.min(background_powers)*0.95) and (mean_empirical <= np.max(background_powers)*1.05):
+        results.add_pass(
+            "NF-01: Background power sensibility",
+            f"Empirical mean ({mean_empirical:.4f} W) is between model background min ({np.min(background_powers):.4f} W) and max ({np.max(background_powers):.4f} W)"
+        )
+    else:
+        results.add_fail(
+            "NF-01: Background power sensibility",
+            f"Empirical mean ({mean_empirical:.4f} W) is NOT between model background min ({np.min(background_powers):.4f} W) and max ({np.max(background_powers):.4f} W)"
+        )
+
+    # plot a bar chart for each entry in background_powers, and on the same figure plot the horizontal line for mean_empirical:
+    if results.plot:
+        fig, ax = plt.subplots()
+        background_power_bars = ax.bar(memspec_names, background_powers, alpha=1, label="Model Background Power", zorder=2)
+        # total_power_bars = ax.bar(memspec_names, total_powers, alpha=1, label="Model Total Power", zorder=0)
+        ax.set(ylabel='Background Power (W)', title='Background Power by Memspec', ylim=(0, max(background_powers) * 1.2))
+        ax.bar_label(background_power_bars, fmt='{:,.3f} W')
+        # ax.bar_label(total_power_bars, fmt='{:,.3f} W')
+        plt.axhline(mean_empirical, color='r', linestyle='--', linewidth=4, label=f"Empirical Mean ({mean_empirical:.3f} W)")
+        plt.title(f"Model Background Power vs Empirical Mean Power ({testname} Scenario)")
+        plt.legend()
+        plt.show()
 
 def test_runtime_performance(results):
     """
@@ -215,18 +238,20 @@ def test_runtime_performance(results):
         
         start_time = time.time()
         try:
-            memspec = load_memspec(memspec_full)
-            workload = load_workload(workload_full)
-            core_model = DDR5CorePowerModel()
-            result = DDR5(memspec, workload, core_model=core_model).compute_core()
+            dimm = DIMM.load_specs(
+                memspec_full,
+                workload_full
+            )
+
+            result = dimm.compute_all()
             elapsed = time.time() - start_time
             
             print(f"  Execution time: {elapsed:.4f} seconds")
             max_time = max(max_time, elapsed)
             
-            if elapsed > 10.0:
+            if elapsed > 1.0:
                 all_passed = False
-                print(f"  [FAIL] Exceeds 10 second limit!")
+                print(f"  [FAIL] Exceeds 1 second limit!")
             else:
                 print(f"  [OK] Within time limit")
                 
@@ -431,30 +456,162 @@ def test_output_regression(results, model_output, baseline_path):
         results.add_pass("F-02: Regression validation",
                         "All outputs match baseline within tolerance")
 
+# take a list of model outputs and compare against empirical data
+# this will be used for the 50/50 rw, 100 r, and idle tests all the same
+def test_total_power(results, model_output_map, empirical_data_path, testname):
+    """
+    Test NF-01: Total power sensibility test
+    Requirement: The mean power measured over empirical benchmarks should be between the minimum and maximum model total power outputs across all memspecs.
+    
+    Parameters:
+    - results: TestResults object to record pass/fail
+    - model_output_map: Map from memspec name to model output dict, which includes "core.P_PRE_STBY_core" for background power
+    - empirical_data_path: Path to HWiNFO CSV file with empirical power measurements
+    """
+    print("\n" + "-" * 70)
+    print(f"TEST: Total Power Sensibility (NF-01) - {testname}")
+    print("-" * 70)
 
-def run_all_tests(empirical_data_path=None):
+    time_data, power_data = load_empirical_data(empirical_data_path)
+    
+    if power_data is not None and len(power_data) > 0:
+        min_empirical = np.min(power_data)
+        max_empirical = np.max(power_data)
+        mean_empirical = np.mean(power_data)
+        
+        print(f"\nEmpirical Data Statistics:")
+        print(f"  Min Power: {min_empirical:.4f} W")
+        print(f"  Max Power: {max_empirical:.4f} W")
+        print(f"  Mean Power: {mean_empirical:.4f} W")
+    else:
+        print("[WARN] Could not parse empirical data")
+        results.add_fail("NF-01: Total power sensibility", 
+                    f"No empirical data found!")
+        return
+    
+    memspec_names = []
+    total_powers = []
+
+    for memspec_name, model_output in model_output_map.items():
+    
+        memspec_names.append(memspec_name)
+        model_total = model_output.get("P_total", 0.0)
+        total_powers.append(model_total)
+        
+        print(f"Model Total Power ({memspec_name}): {model_total:.4f} W")
+        
+    # Test (a): Check empirical power is between min and max model total powers, with some tolerance (since empirical data can be noisy and model is not expected to be exact)
+    if (mean_empirical >= np.min(total_powers)*0.95) and (mean_empirical <= np.max(total_powers)*1.05):
+        results.add_pass(
+            "NF-01: Total power sensibility",
+            f"Empirical mean ({mean_empirical:.4f} W) is between model total power min ({np.min(total_powers):.4f} W) and max ({np.max(total_powers):.4f} W)"
+        )
+    else:
+        results.add_fail(
+            "NF-01: Total power sensibility",
+            f"Empirical mean ({mean_empirical:.4f} W) is NOT between model total power min ({np.min(total_powers):.4f} W) and max ({np.max(total_powers):.4f} W)"
+        )
+
+    # plot a bar chart for each entry in background_powers, and on the same figure plot the horizontal line for mean_empirical:
+    if results.plot:
+        fig, ax = plt.subplots()
+        total_power_bars = ax.bar(memspec_names, total_powers, alpha=1, label="Model Total Power", zorder=0)
+        ax.set(ylabel='Total Power (W)', title='Total Power by Memspec', ylim=(0, max(total_powers) * 1.2))
+        ax.bar_label(total_power_bars, fmt='{:,.3f} W')
+        plt.axhline(mean_empirical, color='r', linestyle='--', linewidth=4, label=f"Empirical Mean ({mean_empirical:.3f} W)")
+        plt.title(f"Model Total Power vs Empirical Mean Power ({testname} Scenario)")
+        plt.legend()
+        plt.show()
+
+def launch_empirical_test(results, memspecs, workload, empirical_data_path, test_function, testname):
+    """
+    Docstring for launch_empirical_test
+    
+    :param results: TestResults object to record pass/fail
+    :param memspecs: A list of paths to each memspec file. This can be simply read from the memspec_paths.txt file generated at the start of run_all_tests.
+    :param workload: The workload.json file corresponding to this empirical test
+    :param empirical_data_path: The .csv file containing the time series data for this empirical test
+    :param test_function: The function that will be called with this empirical data and workload/memspec to generate the pass/fail
+    """
+    # for this workload and corresponding empirical data path, generate the results from all memspec files (idd files)
+
+    model_output_list = []
+    model_memspec_list = []
+
+    for memspec_path in memspecs:
+        print(f"\nGetting model prediction for memspec: {os.path.basename(memspec_path)}")
+        try:
+            dimm = DIMM.load_specs(
+                memspec_path,
+                workload
+            )
+
+            model_output = dimm.compute_all()
+            model_output_list.append(model_output)
+            model_memspec_list.append(os.path.basename(memspec_path))
+        except Exception as e:
+            print(f"\n[ERROR] Failed to run model: {e}")
+            results.add_fail("Model Execution", str(e))
+            return results.print_summary()
+    
+    # once we have all the model outputs, launch the corresponding test function
+    model_output_map = {memspec: output for memspec, output in zip(model_memspec_list, model_output_list)}
+
+    test_function(results, model_output_map, empirical_data_path, testname)
+        
+
+def run_all_tests(empirical_data_path=None, plot=False):
     """Run complete test suite"""
     results = TestResults()
+    results.plot = plot
     
     print("=" * 70)
     print("DDR5 POWER MODEL VERIFICATION TEST SUITE")
     print("=" * 70)
+
+    test_inputs_dir = Path(os.path.dirname(__file__)) / "test_inputs"
+    # read memspec_paths.txt into a list to pass to test launching helper function:
+    with open(test_inputs_dir / "memspec_paths.txt", 'r') as f:
+        memspec_paths = [line.strip() for line in f if line.strip()]
+
+    assert(memspec_paths), "No memspec files found - cannot run tests"
+
+    # helper function to get the workload.json and empirical_data_paths from each test folder:
+    def get_workload_and_empirical(test_folder_name):
+        test_dir = Path(os.path.dirname(__file__)) / "test_inputs" / test_folder_name
+        # the file ending with *workload.json will be the workload file, and the .csv file will be the empirical data file
+        workload_file = list(test_dir.glob("*workload.json"))
+        empirical_file = list(test_dir.glob("*.csv"))
+        return workload_file[0] if workload_file else None, empirical_file[0] if empirical_file else None
+
+    # run background power sensibility test (use idle workload.json)
+    workload_file, empirical_data_path = get_workload_and_empirical("idle_test")
+    launch_empirical_test(results, memspec_paths, workload_file, empirical_data_path, test_background_power_sensibility, "IDLE")
+
+    # run 50/50 read/write testcase
+    workload_file, empirical_data_path = get_workload_and_empirical("50_50_rw_test")
+    launch_empirical_test(results, memspec_paths, workload_file, empirical_data_path, test_total_power, "50/50 Read/Write")
+    # run 100% read testcase
+    workload_file, empirical_data_path = get_workload_and_empirical("100_read_test")
+    launch_empirical_test(results, memspec_paths, workload_file, empirical_data_path, test_total_power, "100% Read")
     
-    # Load default test configuration
+    # Load default test configuration for the regression test to baseline
     memspec_path = os.path.join(os.path.dirname(__file__), "..", 
                                  "workloads", "micron_16gb_ddr5_6400_x8_spec.json")
     workload_path = os.path.join(os.path.dirname(__file__), "..", 
                                   "workloads", "workload.json")
     
-    print(f"\nLoading test configuration...")
+    print(f"\nLoading test configuration for remaining tests...")
     print(f"  Memory Spec: {os.path.basename(memspec_path)}")
     print(f"  Workload: {os.path.basename(workload_path)}")
     
     try:
-        memspec = load_memspec(memspec_path)
-        workload = load_workload(workload_path)
-        core_model = DDR5CorePowerModel()
-        model_output = DDR5(memspec, workload, core_model=core_model).compute_core()
+        dimm = DIMM.load_specs(
+            memspec_path,
+            workload_path
+        )
+
+        model_output = dimm.compute_all()
         
         print(f"\n[OK] Model executed successfully")
         print(f"\nModel Output:")
@@ -466,8 +623,7 @@ def run_all_tests(empirical_data_path=None):
         results.add_fail("Model Execution", str(e))
         return results.print_summary()
     
-    # Run all verification tests
-    test_background_power_sensibility(results, model_output, empirical_data_path)
+    # Run all other verification tests
     test_runtime_performance(results)
     test_input_format_validation(results)
     
@@ -488,6 +644,8 @@ if __name__ == "__main__":
                        help="Path to HWiNFO CSV file with empirical power measurements")
     parser.add_argument("--update-baseline", action="store_true",
                        help="Update the baseline with current model output")
+    parser.add_argument("--plot", action="store_true",
+                       help="Show plots for empirical data and model comparisons")
     
     args = parser.parse_args()
     
@@ -499,10 +657,12 @@ if __name__ == "__main__":
         workload_path = os.path.join(os.path.dirname(__file__), "..",
                                       "workloads", "workload.json")
         
-        memspec = load_memspec(memspec_path)
-        workload = load_workload(workload_path)
-        core_model = DDR5CorePowerModel()
-        model_output = DDR5(memspec, workload, core_model=core_model).compute_core()
+        dimm = DIMM.load_specs(
+            memspec_path,
+            workload_path
+        )
+
+        model_output = dimm.compute_all()
         
         baseline_dir = Path(__file__).parent / "baseline"
         baseline_dir.mkdir(parents=True, exist_ok=True)
@@ -512,8 +672,19 @@ if __name__ == "__main__":
             json.dump(model_output, f, indent=2)
         
         print(f"[OK] Baseline updated: {baseline_path}\n")
-    
+
+    print("Updating memspec_paths.txt with current memspec files in workloads directory...")
+    # find all *spec.json files in workloads directory
+    workloads_dir = Path(os.path.dirname(__file__)).parent / "workloads"
+    test_inputs_dir = Path(os.path.dirname(__file__)) / "test_inputs"
+    spec_files = list(workloads_dir.glob("*spec.json"))
+
+    with open(test_inputs_dir / "memspec_paths.txt", 'w') as f:
+        for spec in spec_files:
+            f.write(str(spec.resolve()) + "\n")
+    print("[OK] memspec_paths.txt updated.\n")
+
     # Run tests
-    all_passed = run_all_tests(args.empirical_data)
+    all_passed = run_all_tests(args.empirical_data, args.plot)
     
     sys.exit(0 if all_passed else 1)

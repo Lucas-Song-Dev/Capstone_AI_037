@@ -157,26 +157,29 @@ jobs:
             
             // Display key power metrics
             const keyMetrics = [
+              'core.P_VDD_core', 
+              'core.P_VPP_core',
+              'core.P_ACT_STBY_core',
+              'core.P_PRE_STBY_core',
+              'core.P_RD_core',
+              'core.P_WR_core',
+              'core.P_REF_core',
               'P_total_core',
-              'P_VDD_core', 
-              'P_VPP_core',
-              'P_ACT_STBY_core',
-              'P_PRE_STBY_core',
-              'P_RD_core',
-              'P_WR_core',
-              'P_REF_core'
+              'if.P_total_interface',
+              'P_total'
             ];
             
             for (const key of keyMetrics) {
               if (baseline[key] !== undefined) {
-                const label = key.replace('P_', '').replace('_core', '').replace(/_/g, ' ');
+                const label = key.replace('P_', '').replace('core.', '').replace('if.', '').replace(/_/g, ' ');
                 comment += `| ${label} | ${baseline[key].toFixed(6)} |\n`;
               }
             }
             
             comment += '\n### Tests Passed:\n';
             comment += '- ✅ **NF-01:** Background power sensibility check\n';
-            comment += '- ✅ **NF-02:** Runtime performance (< 10 seconds)\n';
+            comment += '- ✅ **NF-01:** Total power sensibility check\n';
+            comment += '- ✅ **NF-02:** Runtime performance (< 1 second)\n';
             comment += '- ✅ **C-03:** Input format validation\n';
             comment += '- ✅ **F-02:** Regression validation (outputs match baseline)\n';
             

@@ -1,6 +1,5 @@
 from typing import Dict, Optional
 from parser import load_memspec, load_workload
-from collections import Counter
 
 from interface_model import DDR5InterfacePowerModel
 from core_model import DDR5CorePowerModel
@@ -34,17 +33,20 @@ class DIMM:
         for i in range(0, memspec.memarchitecturespec.nbrOfDevices):
             dram = DDR5.load_spec(memspec_path, workload_path, core_model, interface_model)
             dram_list.append(dram)
-            print(dram_list)
+            # print(dram_list)
 
         return cls(memspec, workload, dram_list)
     
     def compute_all(self) -> Dict[str, float]:
         if self.dram_list is not None:
             for dram in self.dram_list:
-                # Counter allows dicts to be added together
-                self.corepower = dict(Counter(self.corepower) + Counter(dram.compute_core()))
-                self.interfacepower = dict(Counter(self.interfacepower) + Counter(dram.compute_interface()))
-                self.totalpower = dict(Counter(self.totalpower) + Counter(dram.compute_all()))
+                def add_dicts(d1, d2):
+                    keys = set(d1.keys()) | set(d2.keys())
+                    return {k: d1.get(k, 0.0) + d2.get(k, 0.0) for k in keys}
+
+                self.corepower = add_dicts(self.corepower or {}, dram.compute_core())
+                self.interfacepower = add_dicts(self.interfacepower or {}, dram.compute_interface())
+                self.totalpower = add_dicts(self.totalpower or {}, dram.compute_all())
         else:
             raise ValueError("No DRAM devices")
 
