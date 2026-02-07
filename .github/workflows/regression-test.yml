@@ -157,7 +157,6 @@ jobs:
             
             // Display key power metrics
             const keyMetrics = [
-              'P_total_core',
               'core.P_VDD_core', 
               'core.P_VPP_core',
               'core.P_ACT_STBY_core',
@@ -165,7 +164,9 @@ jobs:
               'core.P_RD_core',
               'core.P_WR_core',
               'core.P_REF_core',
-              'if.P_total_interface'
+              'P_total_core',
+              'if.P_total_interface',
+              'P_total'
             ];
             
             for (const key of keyMetrics) {
