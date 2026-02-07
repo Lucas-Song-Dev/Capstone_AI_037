@@ -178,7 +178,7 @@ jobs:
             comment += '\n### Tests Passed:\n';
             comment += '- ✅ **NF-01:** Background power sensibility check\n';
             comment += '- ✅ **NF-01:** Total power sensibility check\n';
-            comment += '- ✅ **NF-02:** Runtime performance (< 10 seconds)\n';
+            comment += '- ✅ **NF-02:** Runtime performance (< 1 second)\n';
             comment += '- ✅ **C-03:** Input format validation\n';
             comment += '- ✅ **F-02:** Regression validation (outputs match baseline)\n';
             
