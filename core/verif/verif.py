@@ -644,8 +644,6 @@ if __name__ == "__main__":
                        help="Path to HWiNFO CSV file with empirical power measurements")
     parser.add_argument("--update-baseline", action="store_true",
                        help="Update the baseline with current model output")
-    parser.add_argument("--update-memspec-paths", action="store_true",
-                       help="Regenerate memspec_paths.txt with current memspec files in workloads directory")
     parser.add_argument("--plot", action="store_true",
                        help="Show plots for empirical data and model comparisons")
     
@@ -675,19 +673,18 @@ if __name__ == "__main__":
         
         print(f"[OK] Baseline updated: {baseline_path}\n")
 
+    print("Updating memspec_paths.txt with current memspec files in workloads directory...")
+    # find all *spec.json files in workloads directory
+    workloads_dir = Path(os.path.dirname(__file__)).parent / "workloads"
+    test_inputs_dir = Path(os.path.dirname(__file__)) / "test_inputs"
+    spec_files = list(workloads_dir.glob("*spec.json"))
+
+    with open(test_inputs_dir / "memspec_paths.txt", 'w') as f:
+        for spec in spec_files:
+            f.write(str(spec.resolve()) + "\n")
+    print("[OK] memspec_paths.txt updated.\n")
+
     # Run tests
-    if args.update_memspec_paths:
-        print("Updating memspec_paths.txt with current memspec files in workloads directory...")
-        # find all *spec.json files in workloads directory
-        workloads_dir = Path(os.path.dirname(__file__)).parent / "workloads"
-        test_inputs_dir = Path(os.path.dirname(__file__)) / "test_inputs"
-        spec_files = list(workloads_dir.glob("*spec.json"))
-
-        with open(test_inputs_dir / "memspec_paths.txt", 'w') as f:
-            for spec in spec_files:
-                f.write(str(spec.resolve()) + "\n")
-        print("[OK] memspec_paths.txt updated.\n")
-
     all_passed = run_all_tests(args.empirical_data, args.plot)
     
     sys.exit(0 if all_passed else 1)
