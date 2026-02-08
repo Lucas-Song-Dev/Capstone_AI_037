@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# Note: Package discovery is handled by setup.py
+# This file only defines project metadata
+
+[project]
+name = "ddr5-power-calculator"
+version = "0.1.0"
+description = "JEDEC-compliant DDR5 power modeling and calculation library"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    {name = "DDR5 Power Calculator Team"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "pandas>=2.0.0",
+    "matplotlib>=3.7.0",
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+# Package configuration is handled by setup.py
+# setuptools.build_meta will use setup.py for package discovery
+# when [tool.setuptools] is not specified in pyproject.toml
+

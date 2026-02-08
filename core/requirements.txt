@@ -1,0 +1,7 @@
+# Core DDR5 Power Calculator Package Dependencies
+# These are the minimal dependencies needed for the core package
+
+pandas>=2.0.0
+matplotlib>=3.7.0
+numpy>=1.24.0
+
