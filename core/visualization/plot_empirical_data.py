@@ -89,7 +89,10 @@ if __name__ == "__main__":
 
     for csv_path in args.empirical_data:
         time_data, power_data = load_empirical_data(csv_path)
-        labels_list.append(os.path.basename(csv_path))
+
+        # use the directory containing the csv file as the label for the plot legend
+        label = os.path.basename(os.path.dirname(csv_path))
+        labels_list.append(label)
         if time_data is not None and power_data is not None:
             time_data_list.append(time_data)
             power_data_list.append(power_data)
@@ -103,7 +106,7 @@ if __name__ == "__main__":
     plt.xlabel("Time (s)")
     plt.xticks(np.arange(0, 20, 2))
     plt.ylabel("Power (W)")
-    plt.title("Empirical Power Data from HWiNFO")
+    plt.title("Empirical Power Data from HWiNFO for Multiple Scenarios")
     plt.legend()
     plt.grid(True)
     plt.show()
