@@ -1,9 +1,5 @@
 from typing import Dict, Optional
-from parser import load_memspec, load_workload, MemSpec, Workload
-
-from interface_model import DDR5InterfacePowerModel
-from core_model import DDR5CorePowerModel
-
+from parser import load_memspec, load_workload
 
 class DDR5:
     def __init__(

@@ -90,10 +90,13 @@ class DIMM:
         # ---- Interface power ----
         print("---- Interface / I/O Power Breakdown (W) ----")
         for k in [
-            "P_driver_read",
-            "P_term_read_others",
-            "P_receiver_write",
-            "P_term_write_others",
+            "P_DQ_WRITE",
+            "P_DQ_READ",
+            "P_CA",
+            "P_CK",
+            "P_WCK",
+            "P_DQS",
+            "P_CS",
             "P_total_interface",
         ]:
             if k in self.interfacepower:
@@ -101,8 +104,8 @@ class DIMM:
         print()
 
         # ---- Totals ----
-        print("---- Total ----")
-        print(f"P_total_core      (W): {self.totalpower['P_total_core']:.4f}")
-        print(f"P_total_interface (W): {self.totalpower['P_total_interface']:.4f}")
-        print(f"P_TOTAL           (W): {self.totalpower['P_total']:.4f}")
+        print("---- Total(W) ---- ")
+        print(f"P_total_core          : {self.totalpower['P_total_core']:.4f}")
+        print(f"P_total_interface     : {self.totalpower['P_total_interface']:.4f}")
+        print(f"P_TOTAL               : {self.totalpower['P_total']:.4f}")
         print("\n===================================================\n")

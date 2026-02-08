@@ -21,8 +21,6 @@ def main():
     memspec_path = (os.path.abspath(args.memspec) if args.memspec else "../workloads/micron_16gb_ddr5_6400_x8_spec.json")
     workload_path = (os.path.abspath(args.workload) if args.workload else "../workloads/workload.json")
     # @TODO option for LPDDR5CorePowerModel()
-    core_model = DDR5CorePowerModel()
-    interface_model = DDR5InterfacePowerModel()
 
     dimm = DIMM.load_specs(
         memspec_path,
