@@ -199,11 +199,11 @@ def test_background_power_sensibility(results, model_output_map, empirical_data_
         background_power_bars = ax.bar(memspec_names, background_powers, alpha=1, label="Model Background Power", zorder=2)
         # total_power_bars = ax.bar(memspec_names, total_powers, alpha=1, label="Model Total Power", zorder=0)
         ax.set(ylabel='Background Power (W)', title='Background Power by Memspec', ylim=(0, max(background_powers) * 1.2))
-        ax.bar_label(background_power_bars, fmt='{:,.3f} W')
+        ax.bar_label(background_power_bars, fmt='{:,.3f} W', fontsize=16)
         # ax.bar_label(total_power_bars, fmt='{:,.3f} W')
         plt.axhline(mean_empirical, color='r', linestyle='--', linewidth=4, label=f"Empirical Mean ({mean_empirical:.3f} W)")
-        plt.title(f"Model Background Power vs Empirical Mean Power ({testname} Scenario)")
-        plt.legend()
+        plt.title(f"Model Background Power vs Empirical Mean Power ({testname} Scenario)", fontsize=20)
+        plt.legend(fontsize=16)
         plt.show()
 
 def test_runtime_performance(results):
@@ -262,10 +262,10 @@ def test_runtime_performance(results):
     
     if all_passed:
         results.add_pass("NF-02: Runtime performance",
-                        f"All scenarios completed in < 10s (max: {max_time:.4f}s)")
+                        f"All scenarios completed in < 1s (max: {max_time:.4f}s)")
     else:
         results.add_fail("NF-02: Runtime performance",
-                        f"One or more scenarios exceeded 10s limit")
+                        f"One or more scenarios exceeded 1s limit")
 
 
 def test_input_format_validation(results):
@@ -293,7 +293,7 @@ def test_input_format_validation(results):
                     "memarchitecturespec": {
                         "width": 8, "nbrOfBanks": 16, "nbrOfBankGroups": 2,
                         "nbrOfRanks": 1, "nbrOfColumns": 1024, "nbrOfRows": 65536,
-                        "burstLength": 8, "dataRate": 2
+                        "burstLength": 8, "dataRate": 2, "nbrOfDevices": 4
                     },
                     "mempowerspec": {
                         # Missing "vdd" field
@@ -322,7 +322,7 @@ def test_input_format_validation(results):
                     "memarchitecturespec": {
                         "width": 8, "nbrOfBanks": 16, "nbrOfBankGroups": 2,
                         "nbrOfRanks": 1, "nbrOfColumns": 1024, "nbrOfRows": 65536,
-                        "burstLength": 8, "dataRate": 2
+                        "burstLength": 8, "dataRate": 2, "nbrOfDevices": 4
                     },
                     "mempowerspec": {
                         "vdd": 1.1, "vpp": 1.8, "vddq": 1.1,
@@ -517,10 +517,10 @@ def test_total_power(results, model_output_map, empirical_data_path, testname):
         fig, ax = plt.subplots()
         total_power_bars = ax.bar(memspec_names, total_powers, alpha=1, label="Model Total Power", zorder=0)
         ax.set(ylabel='Total Power (W)', title='Total Power by Memspec', ylim=(0, max(total_powers) * 1.2))
-        ax.bar_label(total_power_bars, fmt='{:,.3f} W')
+        ax.bar_label(total_power_bars, fmt='{:,.3f} W', fontsize=16)
         plt.axhline(mean_empirical, color='r', linestyle='--', linewidth=4, label=f"Empirical Mean ({mean_empirical:.3f} W)")
-        plt.title(f"Model Total Power vs Empirical Mean Power ({testname} Scenario)")
-        plt.legend()
+        plt.title(f"Model Total Power vs Empirical Mean Power ({testname} Scenario)", fontsize=20)
+        plt.legend(fontsize=16)
         plt.show()
 
 def launch_empirical_test(results, memspecs, workload, empirical_data_path, test_function, testname):
@@ -594,6 +594,15 @@ def run_all_tests(empirical_data_path=None, plot=False):
     # run 100% read testcase
     workload_file, empirical_data_path = get_workload_and_empirical("100_read_test")
     launch_empirical_test(results, memspec_paths, workload_file, empirical_data_path, test_total_power, "100% Read")
+
+    workload_file, empirical_data_path = get_workload_and_empirical("66_33_rw_test")
+    launch_empirical_test(results, memspec_paths, workload_file, empirical_data_path, test_total_power, "66/33 Read/Write")
+
+    workload_file, empirical_data_path = get_workload_and_empirical("75_25_rw_test")
+    launch_empirical_test(results, memspec_paths, workload_file, empirical_data_path, test_total_power, "75/25 Read/Write")
+
+    workload_file, empirical_data_path = get_workload_and_empirical("80_20_rw_test")
+    launch_empirical_test(results, memspec_paths, workload_file, empirical_data_path, test_total_power, "80/20 Read/Write")
     
     # Load default test configuration for the regression test to baseline
     memspec_path = os.path.join(os.path.dirname(__file__), "..", 
