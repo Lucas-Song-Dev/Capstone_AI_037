@@ -594,6 +594,15 @@ def run_all_tests(empirical_data_path=None, plot=False):
     # run 100% read testcase
     workload_file, empirical_data_path = get_workload_and_empirical("100_read_test")
     launch_empirical_test(results, memspec_paths, workload_file, empirical_data_path, test_total_power, "100% Read")
+
+    workload_file, empirical_data_path = get_workload_and_empirical("66_33_rw_test")
+    launch_empirical_test(results, memspec_paths, workload_file, empirical_data_path, test_total_power, "66/33 Read/Write")
+
+    workload_file, empirical_data_path = get_workload_and_empirical("75_25_rw_test")
+    launch_empirical_test(results, memspec_paths, workload_file, empirical_data_path, test_total_power, "75/25 Read/Write")
+
+    workload_file, empirical_data_path = get_workload_and_empirical("80_20_rw_test")
+    launch_empirical_test(results, memspec_paths, workload_file, empirical_data_path, test_total_power, "80/20 Read/Write")
     
     # Load default test configuration for the regression test to baseline
     memspec_path = os.path.join(os.path.dirname(__file__), "..", 
