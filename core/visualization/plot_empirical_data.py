@@ -57,10 +57,12 @@ def load_empirical_data(csv_path, plot=False):
         if (plot):
             # plot the data to verify it looks correct in a bar chart:
             plt.figure(figsize=(10, 5))
-            plt.plot(time_data, power_data, label="Empirical Power (W)")
+            plt.plot(time_data, power_data, label="Empirical Power (W) - 50/50 Read/Write Scenario")
+            plt.yticks(np.arange(0, 2.75, 0.25))
+            plt.xticks(np.arange(0, 20, 2))
             plt.xlabel("Time (s)")
             plt.ylabel("Power (W)")
-            plt.title("Empirical Power Data from HWiNFO")
+            plt.title("Empirical Power Data from HWiNFO - 50/50 Read/Write Scenario")
             plt.legend()
             plt.grid(True)
             plt.show()
@@ -88,7 +90,7 @@ if __name__ == "__main__":
         exit(1)
 
     for csv_path in args.empirical_data:
-        time_data, power_data = load_empirical_data(csv_path)
+        time_data, power_data = load_empirical_data(csv_path, plot=True)
 
         # use the directory containing the csv file as the label for the plot legend
         label = os.path.basename(os.path.dirname(csv_path))
