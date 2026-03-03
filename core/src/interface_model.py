@@ -10,6 +10,10 @@ from parser import MemSpec, Workload
 # approximation intended for architectural and comparative
 # power analysis of DDR5 memory interfaces.
 #
+# Returns power in Watts (W) for each component and total interface power. 
+# SCOPE: the power is for one DIMM rank(only one is active), not per subchannel or per chip. 
+# It is the total power for the entire interface as seen at the DRAM side and Host side.
+#
 # Key assumptions:
 #
 # 1. Resistive I/O Model
@@ -57,6 +61,10 @@ from parser import MemSpec, Workload
 #    workloads, and architectural trade-offs rather than absolute
 #    silicon-accurate power prediction.
 #
+# 8. Only one DRAM rank is modelled. 
+#    Even if a DIMM has 2 ranks and each rank has 2 subchannels, the physical
+#    bus nets are shared on the module; ranks are selected by CS.
+#
 # =========================================================
 
 # ==========================================
@@ -100,7 +108,7 @@ class InterfacePowerInputs:
     vddq: float = 1.1               # DDR5 IO Voltage
 
     # --- Topology Info ---
-    num_subchannels: int = 2        # DDR5 DIMM: typically 2 subchannels per channel
+    num_subchannels: int = 2        # DDR5 DIMM: typically 2 subchannels per rank
     device_width_bits: int = 8      # x8 devices
     devices_per_rank: int = 8       # 8 chips for 64-bit width
     num_ranks: int = 1
@@ -139,9 +147,9 @@ class InterfacePowerInputs:
     wr_duty: float = 0.0            # % of time writing
     
     # Utilization factors (Active time when CKE is high)
-    ca_util: float = 0.15           # Command bus utilization
-    cs_util: float = 0.05           # Chip Select utilization
-    ck_util: float = 1.00           # Clock is typically always running if CKE is High
+    ca_util: float = 0.2           # Command bus utilization
+    cs_util: float = 0.1           # Chip Select utilization
+    ck_util: float = 1.0           # Clock is typically always running if CKE is High
 
     # --- Signal Probabilities (0.0 to 1.0) ---
     # Probability of signal being '0' (Low).
@@ -151,10 +159,48 @@ class InterfacePowerInputs:
     prob_cmd_zero: float = 0.5      # For random commands
     prob_clock_toggle: float = 0.5  # Clocks are 50% duty cycle
 
+    data_rate_hz: float = 0.0       # Data rate in Hz (e.g., 4800 MT/s => 2.4 GHz clock, 4.8 GHz data rate)
+
+
 # ==========================================
 # Main Calculation Logic
 # ==========================================
 class DDR5InterfacePowerModel:
+    def _derive_pin_counts_per_subchannel(self, inputs: InterfacePowerInputs, ca_bits_per_subch: int = 14) -> Dict[str, int]:
+        """
+        Derive per-subchannel pin counts using the same conventions as calculate_termination_power().
+
+        Returns integer counts per subchannel:
+          - num_dq_bits: DQ single-ended wires
+          - dqs_pairs:  DQS differential pairs (1 per byte lane)
+          - wck_pairs:  WCK differential pairs (approx: 1 per byte lane)
+          - num_ca_bits: CA single-ended wires (default 14)
+          - num_cs_bits: CS single-ended wires (default: num_ranks)
+          - ck_pairs: CK differential pairs (default 1)
+        """
+        if int(inputs.num_subchannels) <= 0:
+            raise ValueError("num_subchannels must be > 0")
+
+        total_data_bits_per_rank = int(inputs.devices_per_rank) * int(inputs.device_width_bits)
+        if total_data_bits_per_rank <= 0:
+            raise ValueError("devices_per_rank * device_width_bits must be > 0")
+
+        num_dq = total_data_bits_per_rank // int(inputs.num_subchannels)
+        dqs_pairs = max(1, (num_dq + 7) // 8)
+        wck_pairs = dqs_pairs
+
+        num_cs = int(inputs.num_cs) if inputs.num_cs is not None else int(inputs.num_ranks)
+        ck_pairs = 1
+
+        return {
+            "num_dq_bits": int(num_dq),
+            "dqs_pairs": int(dqs_pairs),
+            "wck_pairs": int(wck_pairs),
+            "num_ca_bits": int(ca_bits_per_subch),
+            "num_cs_bits": int(num_cs),
+            "ck_pairs": int(ck_pairs),
+        }
+
     def calculate_termination_power(self, inputs: InterfacePowerInputs) -> Dict[str, float]:
         """
         Calculates termination power components for DDR5 based on JEDEC principles.
@@ -164,32 +210,13 @@ class DDR5InterfacePowerModel:
         # ---------------------------------------------------
         # 1. Derive Pin Counts (per Sub-channel)
         # ---------------------------------------------------
-        # DQ: Data lines (e.g., 32 bits per subchannel)
-        num_dq = 32 
-        
-        # DQS: Data Strobe (Differential pairs). 1 pair per byte (8 bits)
-        # x8 device needs 1 DQS pair. Total 4 pairs for 32 bits.
-        # 4 pairs * 2 wires = 8 pins
-        num_dqs = (num_dq // 8) * 2 
-        
-        # CA: Command/Address. DDR5 is 14 pins (7 pins x 2 for DDR) or similar depending on mode.
-        # Assuming 14 pins per subchannel for simplicity.
-        num_ca = 14
-        
-        # CS: Chip Select. Default to num_ranks if not provided.
-        # Based on JESD308B logic where each rank has a dedicated CS pin.
-        if inputs.num_cs is None:
-            num_cs = inputs.num_ranks
-        else:
-            num_cs = inputs.num_cs
-        
-        # CK: System Clock (Differential). 1 pair per subchannel = 2 pins.
-        num_ck = 2
-
-        # WCK: Write Clock (DDR5 specific). Differential.
-        # Typically 1 pair per nibble or byte depending on frequency/mode.
-        # Assuming 1 pair per byte -> 4 pairs -> 8 pins.
-        num_wck = (num_dq // 8) * 2
+        pins = self._derive_pin_counts_per_subchannel(inputs, ca_bits_per_subch=14)
+        num_dq = pins["num_dq_bits"]
+        num_ca = pins["num_ca_bits"]
+        num_cs = pins["num_cs_bits"]
+        num_ck = pins["ck_pairs"] * 2
+        num_dqs = pins["dqs_pairs"] * 2
+        num_wck = pins["wck_pairs"] * 2
 
         # ---------------------------------------------------
         # 2. Calculate Power Components
@@ -309,74 +336,173 @@ class DDR5InterfacePowerModel:
 
 
     # ***** PART 2 *****    
-    # Dynamic power based on switching activity: toggling on transmission lines.
+    # Estimates DDR5 interface dynamic (switching) power using a simple capacitive model per wire/group
 
     # Formula: P = N * (C_total * V^2 * f * a)
-    # N: number of pins
-    # C: total input capacitance
+    # N: number of pins/wires
+    # C: effective capacitance per net
     # f: signal clock freqency, some signals are sent at different data rate, like only on rising edge
-    # a: activity factor, how often it actually toggles.
-    
-    # ***** Note on PMIC ***** 
-    # In DDR5, the PMIC is on the DIMM chip, it takes 5V from mother board and step down to 1.1V required by the chip.
+    # alpha: expected toggle probability
+    # V: voltage swing, for POD it may be Vddq/2, for full swing it may be Vddq.
 
-    # Total DIMM power = sum of all internal power(dram+interface+dimm) / PMIC efficiency. 
-    # '''
+    # returns breakdown of dynamic power per signal group and total dynamic power for the interface.
 
 
-    def compute_dynamic(self, input: InterfacePowerInputs) -> Dict[str, float]:
+    def calc_interface_dynamic_power_swing(
+        self,
+        inputs: InterfacePowerInputs,
+        # Capacitance defaults taken from the paper's example:
+        # C_TX=1pF, C_RX=1pF, C_TL=2pF  => C_eq=4pF per net
+        c_eq_f_per_net: float = 4e-12,
+        # Voltage swing assumptions: For POD-style lines start with vddq/2; for full-swing use vddq.
+        v_swing_data: Optional[float] = None,
+        v_swing_cmd: Optional[float] = None,
+        v_swing_ck:  Optional[float] = None,
+        v_swing_dqs: Optional[float] = None,
+        v_swing_wck: Optional[float] = None,
+        # CA width assumption for DDR5 UDIMM per subchannel
+        ca_bits_per_subch: int = 14,
+    ) -> Dict[str, float]:
 
-        ## temporary capacitance for dimm
-        c_dq  = 3.5e-12    # 3.5 pF (Pin + Trace)
-        c_ca  = 8.0e-12    
-        c_ck  = 12.0e-12   
-        c_dqs = 3.5e-12    
+        # Default swings
+        if v_swing_data is None: v_swing_data = inputs.vddq / 2.0
+        if v_swing_cmd  is None: v_swing_cmd  = inputs.vddq / 2.0
+        if v_swing_ck   is None: v_swing_ck   = inputs.vddq
+        if v_swing_dqs  is None: v_swing_dqs  = inputs.vddq / 2.0
+        if v_swing_wck  is None: v_swing_wck  = v_swing_ck
 
-        # f_clock = Data Rate / 2 (e.g., 4800 MT/s -> 2.4 GHz), 
-        # FIXME: maybe front side and back side have different clock frequency
-        f_clock = (4800 / 2) * 1e6 
-        # CA bus in DDR5 runs at 1/2 clock speed (1.2 GHz)
-        f_ca = f_clock / 2 
-        
-        v2 = input.vddq ** 2
-        
-        # DQ: Toggle probability = 0.5. Active during Read + Write
-        num_dq = 32
-        P_DQ_dyn = (num_dq * c_dq * v2 * f_clock) * 0.5 * (input.rd_duty + input.wr_duty)
-        
-        # CA: Toggle probability = 0.5. Active based on CA utilization
-        num_ca = 14
-        P_CA_dyn = (num_ca * c_ca * v2 * f_ca) * 0.5 * input.ca_util
-        
-        # CK (Clock): Differential (2 wires), Toggles every cycle (alpha=1.0)
-        # Always running as long as the DIMM is powered.
-        num_ck = 2
-        P_CK_dyn = (num_ck * 2) * (c_ck * v2 * f_clock) * 1.0
-        
-        # DQS (Strobe): Differential (2 wires), Toggles every cycle during data bursts.
-        num_dqs = (num_dq // 8) * 2 
-        P_DQS_dyn = (num_dqs * 2) * (c_dqs * v2 * f_clock) * (input.rd_duty + input.wr_duty)
-        
-        total = P_DQ_dyn + P_CA_dyn + P_CK_dyn + P_DQS_dyn
+        # --- Derive per-subchannel pin counts (match calculate_termination_power()) ---
+        pins = self._derive_pin_counts_per_subchannel(inputs, ca_bits_per_subch=ca_bits_per_subch)
+        dq_bits_per_subch = pins["num_dq_bits"]
+        ca_bits_per_subch = pins["num_ca_bits"]
+        cs_bits_per_subch = pins["num_cs_bits"]
+        ck_pairs_per_subch = pins["ck_pairs"]
+        dqs_pairs_per_subch = pins["dqs_pairs"]
+        wck_pairs_per_subch = pins["wck_pairs"]
 
-        return {
-            "P_DQ_dyn": P_DQ_dyn,
-            "P_CA_dyn": P_CA_dyn,
-            "P_CK_dyn": P_CK_dyn,
-            "P_DQS_dyn": P_DQS_dyn,
-            "P_Total_Dynamic": total
+        # --- Signal counts (wires) ---
+        n_dq_wires_subch = dq_bits_per_subch
+        n_ca_wires_subch = ca_bits_per_subch
+        n_cs_wires_subch = cs_bits_per_subch
+        n_ck_wires_subch = ck_pairs_per_subch * 2
+        n_dqs_wires_subch = dqs_pairs_per_subch * 2
+        n_wck_wires_subch = wck_pairs_per_subch * 2
+
+        n_dq_wires = inputs.num_subchannels * n_dq_wires_subch
+        n_ca_wires = inputs.num_subchannels * n_ca_wires_subch
+        n_cs_wires = inputs.num_subchannels * n_cs_wires_subch
+        n_ck_wires = inputs.num_subchannels * n_ck_wires_subch
+        n_dqs_wires = inputs.num_subchannels * n_dqs_wires_subch
+        n_wck_wires = inputs.num_subchannels * n_wck_wires_subch
+
+        # --- Opportunity frequencies ---
+        # DQ opportunity rate = data_rate_hz (UI rate)
+        data_rate_hz = inputs.data_rate_hz
+        f_dq  = data_rate_hz
+
+        # CA typically transfers at CK rate (1 per CK edge/cycle depending on encoding).
+        # A common quick approximation: f_ca = f_ck = data_rate_hz/2 for DDR.
+        f_ck = data_rate_hz / 2.0
+        f_ca = f_ck
+        f_cs = f_ck
+        f_wck = f_ck
+
+        # DQS toggles with burst traffic; treat opportunity like DQ but gated by rd/wr duty.
+        f_dqs = data_rate_hz
+
+        # --- Toggle probabilities (alpha) ---
+        # TODO: explain assumption here
+        alpha_data = 0.5
+        alpha_cmd  = 0.5
+
+        # Ideal clock: toggles every half-period. In CV^2 f form we already used f_ck (cycles/sec),
+        # so alpha_ck should represent toggles per cycle. A square wave has 2 toggles/cycle.
+        alpha_ck = 2.0
+
+        # DQS is like a strobe; in bursts it’s square-like. Same convention as CK:
+        alpha_dqs = 2.0
+        alpha_wck = 2.0
+
+        # --- Power calculations ---
+        # Utilization multipliers (use inputs directly; no clamping/min/max).
+        util_rd = inputs.rd_duty
+        util_wr = inputs.wr_duty
+        util_dq = util_rd + util_wr
+        util_dqs = util_dq
+        util_wck = util_wr
+        util_ca = inputs.ca_util
+        util_cs = inputs.cs_util
+        util_ck = inputs.ck_util
+
+        def p_group(n_wires: int, util: float, alpha: float, f: float, v_swing: float) -> float:
+            return float(n_wires) * util * alpha * f * c_eq_f_per_net * (v_swing ** 2)
+
+        p_dq_subch = p_group(n_dq_wires_subch, util_dq, alpha_data, f_dq, v_swing_data)
+        p_ca_subch = p_group(n_ca_wires_subch, util_ca, alpha_cmd, f_ca, v_swing_cmd)
+        p_cs_subch = p_group(n_cs_wires_subch, util_cs, alpha_cmd, f_cs, v_swing_cmd)
+        p_ck_subch = p_group(n_ck_wires_subch, util_ck, alpha_ck, f_ck, v_swing_ck)
+        p_dqs_subch = p_group(n_dqs_wires_subch, util_dqs, alpha_dqs, f_dqs, v_swing_dqs)
+        p_wck_subch = p_group(n_wck_wires_subch, util_wck, alpha_wck, f_wck, v_swing_wck)
+
+        p_dq = p_dq_subch * inputs.num_subchannels
+        p_ca = p_ca_subch * inputs.num_subchannels
+        p_cs = p_cs_subch * inputs.num_subchannels
+        p_ck = p_ck_subch * inputs.num_subchannels
+        p_dqs = p_dqs_subch * inputs.num_subchannels
+        p_wck = p_wck_subch * inputs.num_subchannels
+
+        p_total = p_dq + p_ca + p_cs + p_ck + p_dqs + p_wck
+
+        out: Dict[str, float] = {
+            "P_dyn_total_W": p_total,
+            "P_dyn_dq_W": p_dq,
+            "P_dyn_ca_W": p_ca,
+            "P_dyn_cs_W": p_cs,
+            "P_dyn_ck_W": p_ck,
+            "P_dyn_dqs_W": p_dqs,
+            "P_dyn_wck_W": p_wck,
+            "P_dyn_total_interface": p_total,
+            "P_dyn_total_subch_W": (p_dq_subch + p_ca_subch + p_cs_subch + p_ck_subch + p_dqs_subch + p_wck_subch),
         }
-
+        return out
+    
+    
     def compute(self, memspec: MemSpec, workload: Workload) -> Dict[str, float]:
+        arch = memspec.memarchitecturespec
+        num_subchannels = 2
 
-        input = InterfacePowerInputs(
+        # Many provided specs use `nbrOfDevices` as devices-per-subchannel for x{width}.
+        # Infer full devices-per-rank accordingly (so x8: 4 per subch => 8 per rank).
+        device_width_bits = arch.width
+        nbr_of_devices_field = arch.nbrOfDevices
+        expected_per_subch = 32 // device_width_bits
+        if nbr_of_devices_field == expected_per_subch:
+            devices_per_rank = nbr_of_devices_field * num_subchannels
+        else:
+            devices_per_rank = nbr_of_devices_field
+
+        inputs = InterfacePowerInputs(
+            vdd=memspec.mempowerspec.vdd,
             vddq=memspec.mempowerspec.vddq,
-            rd_duty=workload.RDsch_percent/100,
-            wr_duty=workload.WRsch_percent/100,
-            ca_util=0.15,
-            cs_util=0.22,
+            num_subchannels=num_subchannels,
+            device_width_bits=arch.width,
+            devices_per_rank=devices_per_rank,
+            num_ranks=arch.nbrOfRanks,
+            rd_duty=workload.RDsch_percent / 100.0,
+            wr_duty=workload.WRsch_percent / 100.0,
+            data_rate_hz = (1.0 / memspec.memtimingspec.tCK) * 2.0,  # DDR: data rate is 2x clock rate
         )
-        termination = self.calculate_termination_power(input)
-        dynamic = self.compute_dynamic(input)
 
-        return termination
+        termination = self.calculate_termination_power(inputs)
+        dynamic = self.calc_interface_dynamic_power_swing(inputs)
+
+        p_term = float(termination.get("P_total_interface", 0.0))
+        p_dyn = float(dynamic.get("P_dyn_total_interface", dynamic.get("P_dyn_total_W", 0.0)))
+
+        merged: Dict[str, float] = {}
+        merged.update(termination)
+        merged.update(dynamic)
+        merged["P_total_interface_term"] = p_term
+        merged["P_total_interface_dyn"] = p_dyn
+        merged["P_total_interface"] = p_term + p_dyn
+        return merged
