@@ -1,0 +1,4 @@
+{
+    "testname": "100% Read",
+    "test_function": "test_total_power"
+}

@@ -1,0 +1,4 @@
+{
+    "testname": "80/20 Read/Write",
+    "test_function": "test_total_power"
+}
