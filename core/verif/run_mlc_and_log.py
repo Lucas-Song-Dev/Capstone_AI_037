@@ -72,10 +72,11 @@ def analyze_system_utilization(mlc_path, ram_mt_s, channels=2):
     print("-" * 50)
 
     # Test reads and writes
+    """
     rw_latency, rw_bw = run_mlc_test(mlc_path=mlc_path, workload_argument="-W5", duration=20)
     if rw_bw:
         util = (rw_bw / theo_max) * 100
-        print(f"RD/WR Bandwidth as percentage: {util:.2f}% ({rw_bw:,.2f} MB/s)")
+        print(f"RD/WR (1:1) Bandwidth as percentage: {util:.2f}% ({rw_bw:,.2f} MB/s)")
         print(f"--> Use this % as input RDsch_percent and/or WRsch_percent in workload.json.")
 
     time.sleep(10) # wait before next test to allow HWiNFO to stabilize
@@ -92,6 +93,31 @@ def analyze_system_utilization(mlc_path, ram_mt_s, channels=2):
     print("Running idle test for 20 seconds. Please do not interact with the system during this time.")
     time.sleep(20)
     print("Idle test complete. You can now interact with the system.")
+
+    time.sleep(10) # wait before next test to allow HWiNFO to stabilize
+
+    rw_latency, rw_bw = run_mlc_test(mlc_path=mlc_path, workload_argument="-W2", duration=20)
+    if rw_bw:
+        util = (rw_bw / theo_max) * 100
+        print(f"RD/WR (2:1) Bandwidth as percentage: {util:.2f}% ({rw_bw:,.2f} MB/s)")
+        print(f"--> Use this % as input RDsch_percent and/or WRsch_percent in workload.json.")
+
+    time.sleep(10) # wait before next test to allow HWiNFO to stabilize
+
+    rw_latency, rw_bw = run_mlc_test(mlc_path=mlc_path, workload_argument="-W3", duration=20)
+    if rw_bw:
+        util = (rw_bw / theo_max) * 100
+        print(f"RD/WR (3:1) Bandwidth as percentage: {util:.2f}% ({rw_bw:,.2f} MB/s)")
+        print(f"--> Use this % as input RDsch_percent and/or WRsch_percent in workload.json.")
+    """
+
+    rw_latency, rw_bw = run_mlc_test(mlc_path=mlc_path, workload_argument="-W12", duration=20)
+    if rw_bw:
+        util = (rw_bw / theo_max) * 100
+        print(f"RD/WR (4:1) Bandwidth as percentage: {util:.2f}% ({rw_bw:,.2f} MB/s)")
+        print(f"--> Use this % as input RDsch_percent and/or WRsch_percent in workload.json.")
+
+
 
 if __name__ == "__main__":
     import argparse

@@ -10,7 +10,8 @@
       "nbrOfColumns": 1024,
       "nbrOfRows": 65536,
       "burstLength": 8,
-      "dataRate": 2
+      "dataRate": 2,
+      "nbrOfDevices": 4
     },
     "mempowerspec": {
       "vdd": 1.1,
