@@ -1,0 +1,53 @@
+{
+  "memspec": {
+    "memoryId": "micron_12gb_lpddr5x_bg_x16_bl16",
+    "memoryType": "LPDDR5X",
+
+    "memarchitecturespec": {
+      "width": 16,
+      "nbrOfBanks": 16,
+      "nbrOfBankGroups": 4,
+      "nbrOfRanks": 1,
+      "nbrOfColumns": 64,
+      "nbrOfRows": 49152,
+      "nbrOfDevices": 1,
+      "burstLength": 16,
+      "dataRate": 2,
+      "notes": "BG mode addressing & geometry from Micron Y4BM LPDDR5/LPDDR5X datasheet Table 3/4"
+    },
+
+    "mempowerspec": {
+      "notes": "IDD values are per-rail in Micron datasheet; BG mode, DVFSC/DVFSQ disabled, BL=16, DBI disabled; IDD4RQ is typical reference only.",
+      "rails": {
+        "vdd1_range_V": [1.70, 1.95],
+        "vdd2h_range_V": [1.01, 1.12],
+        "vdd2l_range_V": [0.87, 0.97],
+        "vddq_range_V": [0.47, 0.57]
+      },
+
+      "idd_by_rail_A": {
+        "idd2n": { "vdd1": 1.5e-3, "vdd2h": 16.0e-3, "vdd2l": 0.2e-3, "vddq": 0.6e-3 },
+        "idd3n": { "vdd1": 1.7e-3, "vdd2h": 21.0e-3, "vdd2l": 0.2e-3, "vddq": 0.6e-3 },
+
+        "idd4r": { "vdd1": 12.0e-3, "vdd2h": 475.0e-3, "vdd2l": 0.2e-3, "vddq_read": 126.0e-3 },
+        "idd4w": { "vdd1": 11.0e-3, "vdd2h": 310.0e-3, "vdd2l": 0.2e-3, "vddq": 0.6e-3 },
+
+        "idd5b_allbank": { "vdd1": 2.5e-3, "vdd2h": 24.0e-3, "vdd2l": 0.2e-3, "vddq": 0.6e-3 },
+        "idd5pb_perbank": { "vdd1": 2.5e-3, "vdd2h": 24.0e-3, "vdd2l": 0.2e-3, "vddq": 0.6e-3 }
+      },
+
+      "compat_hint": {
+        "vpp": 0.0,
+        "ipp_fields_not_applicable": true
+      }
+    },
+
+    "memtimingspec": {
+      "notes": "This Micron datasheet provides density-dependent refresh timing only; full LPDDR5X AC timings need General LPDDR5/LPDDR5X Specifications.",
+      "RFCab_ns": 280.0,
+      "RFCpb_ns": 140.0,
+      "PBR2PBR_ns": 90.0,
+      "PBR2ACT_ns": 7.5
+    }
+  }
+}
