@@ -24,20 +24,22 @@ class DIMM:
         self.interface_model = interface_model
 
     @classmethod
-    def load_specs(cls, memspec_path: str, workload_path: str):
+    def load_specs(cls, memspec_path: str, workload_path: str, core_model=None, interface_model=None, dram_cls=DDR5):
         memspec = load_memspec(memspec_path)
         workload = load_workload(workload_path)
 
-        core_model = DDR5CorePowerModel()
-        interface_model = DDR5InterfacePowerModel()
+        if core_model is None:
+            core_model = DDR5CorePowerModel()
+        if interface_model is None:
+            interface_model = DDR5InterfacePowerModel()
 
         dimm = cls.from_memspec(
             memspec,
             workload,
             core_model=core_model,
             interface_model=interface_model,
+            dram_cls=dram_cls,
         )
-
         return dimm
 
     def _infer_devices_per_rank(device_width_bits: int, nbr_of_devices_field: int, num_subchannels: int) -> int:
@@ -65,6 +67,7 @@ class DIMM:
         workload,
         core_model: Optional[DDR5CorePowerModel] = None,
         interface_model: Optional[DDR5InterfacePowerModel] = None,
+        dram_cls=DDR5,
         num_subchannels: int = 2,
     ):
         core_model = core_model or DDR5CorePowerModel()
@@ -81,7 +84,9 @@ class DIMM:
 
         # generate a list of DRAM devices for the DIMM
         # if some device are running at different frequencies, we could extend this to take a list of memspecs and workloads per device
-        dram_list = [DDR5(memspec, workload, core_model=core_model) for _ in range(total_devices)]
+        dram_list = [dram_cls(memspec, workload, 
+                      core_model=core_model,
+                      interface_model=interface_model) for _ in range(total_devices)]
 
         # Note that interface power is computed once per DIMM, not per device, since it's a shared bus property.
         return cls(memspec, workload, dram_list, interface_model=interface_model)
