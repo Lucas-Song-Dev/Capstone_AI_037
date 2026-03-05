@@ -2,6 +2,7 @@
   "memspec": {
     "memoryId": "skhynix_8gb_ddr5_4800_x16",
     "memoryType": "DDR5",
+    "registered": false,
     "notes": "Spec derived from https://gzhls.at/blob/ldb/b/e/5/8/5bc212f7c92604fd3737505ee4c96014733c.pdf at 4800 MT/s",
     "memarchitecturespec": {
       "width": 8,
