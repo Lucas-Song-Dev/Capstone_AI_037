@@ -1,0 +1,55 @@
+name: Backend API Tests
+
+on:
+  push:
+    branches: [ main, master, fullstack ]
+    paths:
+      - 'backend/**'
+      - 'core/**'
+      - '.github/workflows/backend-test.yml'
+  pull_request:
+    branches: [ main, master, fullstack ]
+    paths:
+      - 'backend/**'
+      - 'core/**'
+  workflow_dispatch:
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+    
+    - name: Install core package
+      run: |
+        cd core
+        pip install -e .
+        pip install -r requirements.txt
+    
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        pip install -r requirements.txt
+        pip install pytest pytest-cov fastapi[all]
+    
+    - name: Run backend API tests
+      run: |
+        cd backend
+        pytest tests/ -v --cov=src --cov-report=term-missing
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: backend-test-results
+        path: backend/tests/
+        retention-days: 30
+
