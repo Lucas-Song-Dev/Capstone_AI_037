@@ -2,6 +2,7 @@
   "memspec": {
     "memoryId": "micron_16gb_ddr5_6400_x8",
     "memoryType": "DDR5",
+    "registered": false,
     "memarchitecturespec": {
       "width": 8,
       "nbrOfBanks": 32,

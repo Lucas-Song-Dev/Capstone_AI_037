@@ -67,6 +67,7 @@ class MemTimingSpec:
 class MemSpec:
     memoryId: str
     memoryType: str
+    registered: bool
     memarchitecturespec: MemArchitectureSpec
     mempowerspec: MemPowerSpec
     memtimingspec: MemTimingSpec
@@ -119,6 +120,8 @@ def load_memspec(path: str) -> MemSpec:
         raise ValueError("Missing required section 'mempowerspec' in memspec")
     if "memtimingspec" not in raw:
         raise ValueError("Missing required section 'memtimingspec' in memspec")
+    
+    register = bool(raw["registered"])
     
     arch_raw = raw["memarchitecturespec"]
     p_raw = raw["mempowerspec"]
@@ -202,6 +205,7 @@ def load_memspec(path: str) -> MemSpec:
     return MemSpec(
         memoryId           = str(raw.get("memoryId", "")),
         memoryType         = str(raw.get("memoryType", "")),
+        registered          = register,
         memarchitecturespec = arch,
         mempowerspec        = power,
         memtimingspec       = timing,

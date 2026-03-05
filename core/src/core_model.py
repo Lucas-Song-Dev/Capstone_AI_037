@@ -69,8 +69,6 @@ class DDR5CorePowerModel:
         duty_act_pre = min(1.0, t_row_cycle / tRRDsch_s) if tRRDsch_s > 0 else 0.0
         duty_act_vpp = min(1.0, tRAS / tRRDsch_s) if tRRDsch_s > 0 else 0.0
 
-        # NOTE: you had a TODO here. Keep it explicit.
-        # If your baseline state is "precharged background", idd2n makes sense.
         P_ACT_PRE_vdd = vdd * (p.idd0 - p.idd2n) * duty_act_pre
         P_ACT_vpp     = vpp * (p.ipp0 - p.ipp2n) * duty_act_vpp
 
