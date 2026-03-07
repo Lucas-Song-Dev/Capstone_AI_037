@@ -18,7 +18,19 @@ class MemArchitectureSpec:
     nbrOfRows: int
     nbrOfDevices: int
     burstLength: int
-    dataRate: 2
+    dataRate: int
+
+
+# Field reference:
+# - width: Per-device I/O width in bits (e.g., x4/x8/x16). Total bus width per subchannel = nbrOfDevices * width.
+# - nbrOfBanks: Number of banks per bank group
+# - nbrOfBankGroups: Number of bank groups.
+# - nbrOfRanks: Number of ranks on the channel (ranks share the same DQ bus via chip-select).
+# - nbrOfColumns: Number of column addresses per row
+# - nbrOfRows: Number of row addresses per bank.
+# - nbrOfDevices: Number of DRAM devices that make up the data bus for one subchannel (not per-rank).
+# - burstLength: Number of data beats per burst (BL).
+# - dataRate: Transfers per clock.
 
 @dataclass
 class MemPowerSpec:
