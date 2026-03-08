@@ -59,7 +59,7 @@ class LPDDR5CorePowerModel:
 
         def _sub(a: Dict[str, float], b: Dict[str, float]) -> Dict[str, float]:
             keys = set(a.keys()) | set(b.keys())
-            return {k: a.get(k, 0.0) - b.get(k, 0.0) for k in keys}
+            return {k: max(0.0, a.get(k, 0.0) - b.get(k, 0.0)) for k in keys}
 
         def _scale(a: Dict[str, float], s: float) -> Dict[str, float]:
             return {k: v * s for k, v in a.items()}

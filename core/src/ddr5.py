@@ -30,7 +30,9 @@ class DDR5:
         if self.corepower is None:
             raise RuntimeError("Must call compute_core() before report_power()")
 
-        print("\n================ DDR5 POWER REPORT ================\n")
+        print("\n" + "="*60)
+        print("DDR5 Device Core Power Report")
+        print("="*60)
 
         # ---- MemSpec summary ----
         arch = self.memspec.memarchitecturespec
@@ -42,7 +44,7 @@ class DDR5:
         print()
 
         # ---- Core power ----
-        print("---- Core Power Breakdown (W) ----")
+        print("--- Core Power Breakdown (W) ---")
         for k in [
             "P_PRE_STBY_core",
             "P_ACT_STBY_core",
@@ -55,7 +57,5 @@ class DDR5:
             "P_total_core",
         ]:
             if k in self.corepower:
-                print(f"{k:22s}: {self.corepower[k]:.4f}")
-        print()
-
-        print("\n===================================================\n")
+                print(f"  {k:25s}: {self.corepower[k]:12.6f}")
+        print("="*60 + "\n")
