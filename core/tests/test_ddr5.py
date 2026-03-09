@@ -65,7 +65,7 @@ class TestDDR5:
         memspec = load_memspec(str(sample_memspec_path))
         workload = load_workload(str(sample_workload_path))
         
-        dimm = DIMM(memspec, workload, core_model=core_model)
+        dimm = DIMM.load_specs(str(sample_memspec_path), str(sample_workload_path), core_model=core_model)
         result = dimm.compute_core()
         
         assert result is not None
@@ -79,7 +79,7 @@ class TestDDR5:
         memspec = load_memspec(str(sample_memspec_path))
         workload = load_workload(str(sample_workload_path))
         
-        dimm = DIMM(memspec, workload, interface_model=interface_model)
+        dimm = DIMM.load_specs(str(sample_memspec_path), str(sample_workload_path), interface_model=interface_model)
         result = dimm.compute_interface()
         
         assert result is not None
@@ -92,7 +92,7 @@ class TestDDR5:
         memspec = load_memspec(str(sample_memspec_path))
         workload = load_workload(str(sample_workload_path))
         
-        dimm = DIMM(memspec, workload, core_model=core_model, interface_model=interface_model)
+        dimm = DIMM.load_specs(str(sample_memspec_path), str(sample_workload_path), core_model=core_model, interface_model=interface_model)
         result = dimm.compute_all()
         
         assert result is not None
