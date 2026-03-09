@@ -17,23 +17,19 @@ class LPDDR5:
         memspec,
         workload,
         core_model=None,
-        interface_model=None,
     ):
         self.memspec = memspec
         self.workload = workload
         self.core_model = core_model
-        self.interface_model = interface_model
 
         self.corepower: Optional[Dict[str, float]] = None
-        self.interfacepower: Optional[Dict[str, float]] = None
-        self.totalpower: Optional[Dict[str, float]] = None
 
     @classmethod
-    def load_spec(cls, memspec_path: str, workload_path: str, core_model=None, interface_model=None):
+    def load_spec(cls, memspec_path: str, workload_path: str, core_model=None):
         """Load LPDDR5 specification and workload from JSON files."""
         memspec = load_memspec(memspec_path)
         workload = load_workload(workload_path)
-        return cls(memspec, workload, core_model=core_model, interface_model=interface_model)
+        return cls(memspec, workload, core_model=core_model)
 
     def compute_core(self) -> Dict[str, float]:
         """Compute core power for LPDDR5."""
@@ -42,53 +38,42 @@ class LPDDR5:
         self.corepower = self.core_model.compute(self.memspec, self.workload)
         return self.corepower
 
-    def compute_interface(self) -> Dict[str, float]:
-        """Compute interface power for LPDDR5."""
-        if self.interface_model is None:
-            raise ValueError("interface_model is None")
-        self.interfacepower = self.interface_model.compute(self.memspec, self.workload)
-        return self.interfacepower
-
-    def compute_all(self) -> Dict[str, float]:
-        """Compute total power (core + interface)."""
-        core = self.compute_core()
-        interface = self.compute_interface()
-
-        # Merge with namespace to avoid key collisions
-        merged = {}
-        merged.update({f"core.{k}": v for k, v in core.items()})
-        merged.update({f"if.{k}": v for k, v in interface.items()})
-
-        # Optional totals if both models provide totals
-        core_total = core.get("P_total_core", 0.0)
-        if_total = interface.get("P_total_interface", 0.0)
-        merged["P_total_system"] = core_total + if_total
-
-        self.totalpower = merged
-        return merged
-
     def report_power(self):
-        """Print power report."""
-        if self.totalpower is None:
-            self.compute_all()
+        """Print LPDDR5 core power report."""
+        if self.corepower is None:
+            raise RuntimeError("Must call compute_core() before report_power()")
         
         print("\n" + "="*60)
-        print("LPDDR5 Power Report")
+        print("LPDDR5 Device Core Power Report")
         print("="*60)
+
+        arch = self.memspec.memarchitecturespec
+        print("Memory:", self.memspec.memoryId)
+        print("Type:", self.memspec.memoryType)
+        print(f"Device width: x{arch.width}")
+        print(f"Banks: {arch.nbrOfBanks}  |  Bank Groups: {arch.nbrOfBankGroups}")
+        print(f"Rows: {arch.nbrOfRows}  |  Columns: {arch.nbrOfColumns}")
+        print()
         
-        if self.corepower:
-            print("\n--- Core Power ---")
-            for key, val in self.corepower.items():
-                print(f"  {key:25s}: {val:12.6f} W")
-        
-        if self.interfacepower:
-            print("\n--- Interface Power ---")
-            for key, val in self.interfacepower.items():
-                print(f"  {key:25s}: {val:12.6f} W")
-        
-        if self.totalpower:
-            print("\n--- Total Power ---")
-            for key, val in self.totalpower.items():
-                print(f"  {key:25s}: {val:12.6f} W")
+        # ---- Core power ----
+        print("--- Core Power Breakdown (W) ---")
+        # Display in consistent order
+        for k in [
+            "P_PRE_STBY_core",
+            "P_ACT_STBY_core",
+            "P_background",
+            "P_ACT_PRE_core",
+            "P_RD_core",
+            "P_WR_core",
+            "P_REF_core",
+            "P_SELFREF",
+            "P_VDD1",
+            "P_VDD2H",
+            "P_VDD2L",
+            "P_VDDQ",
+            "P_total_core",
+        ]:
+            if k in self.corepower:
+                print(f"  {k:25s}: {self.corepower[k]:12.6f}")
         
         print("="*60 + "\n")

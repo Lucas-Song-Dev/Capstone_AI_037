@@ -47,8 +47,8 @@ class DDR5CorePowerModel:
         # --------------------------------------------------------------------
         duty_ref = tRFC1_s / tREFI_s
 
-        P_REF_vdd = vdd * (p.idd5b - p.idd3n) * duty_ref
-        P_REF_vpp = vpp * (p.ipp5b - p.ipp3n) * duty_ref
+        P_REF_vdd = max(0.0, vdd * (p.idd5b - p.idd3n) * duty_ref)
+        P_REF_vpp = max(0.0, vpp * (p.ipp5b - p.ipp3n) * duty_ref)
         P_REF_core = P_REF_vdd + P_REF_vpp
 
         # --------------------------------------------------------------------
@@ -57,8 +57,8 @@ class DDR5CorePowerModel:
         duty_rd = RD_frac
         duty_wr = WR_frac
 
-        P_RD_core = vdd * (p.idd4r - p.idd3n) * duty_rd
-        P_WR_core = vdd * (p.idd4w - p.idd3n) * duty_wr
+        P_RD_core = max(0.0, vdd * (p.idd4r - p.idd3n) * duty_rd)
+        P_WR_core = max(0.0, vdd * (p.idd4w - p.idd3n) * duty_wr)
 
         # --------------------------------------------------------------------
         # 4) Activate / Precharge incremental power (VDD + VPP)
@@ -69,8 +69,8 @@ class DDR5CorePowerModel:
         duty_act_pre = min(1.0, t_row_cycle / tRRDsch_s) if tRRDsch_s > 0 else 0.0
         duty_act_vpp = min(1.0, tRAS / tRRDsch_s) if tRRDsch_s > 0 else 0.0
 
-        P_ACT_PRE_vdd = vdd * (p.idd0 - p.idd2n) * duty_act_pre
-        P_ACT_vpp     = vpp * (p.ipp0 - p.ipp2n) * duty_act_vpp
+        P_ACT_PRE_vdd = max(0.0, vdd * (p.idd0 - p.idd2n) * duty_act_pre)
+        P_ACT_vpp     = max(0.0, vpp * (p.ipp0 - p.ipp2n) * duty_act_vpp)
 
         P_ACT_PRE_core = P_ACT_PRE_vdd + P_ACT_vpp
 

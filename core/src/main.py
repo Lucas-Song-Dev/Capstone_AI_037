@@ -19,6 +19,8 @@ def main():
                        help="Path to memspec JSON file with IDD values and architectural parameters")
     parser.add_argument("--workload", type=str,
                        help="Path to workload JSON file with activity breakdowns")
+    parser.add_argument("--plot", action="store_true",
+                       help="Generate power visualization plots (requires matplotlib)")
     
     args = parser.parse_args()
 
@@ -55,8 +57,17 @@ def main():
             interface_model=interface_model
         )
 
-    dimm.compute_all()
+    results = dimm.compute_all()
     dimm.report_dimm_power()
+    
+    # Generate visualizations if requested
+    if args.plot:
+        try:
+            plot_power(results, memory_type=memory_type)
+        except ImportError as e:
+            print(f"\nERROR: Visualization skipped: matplotlib not installed ({e})")
+        except Exception as e:
+            print(f"\nERROR: Visualization failed: {e}")
 
 
 if __name__ == "__main__":

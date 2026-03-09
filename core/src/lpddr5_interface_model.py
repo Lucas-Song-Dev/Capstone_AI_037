@@ -149,7 +149,11 @@ class LPDDR5InterfacePowerModel:
         # 5) Termination power on VDD2L (for DQ/DQS pulls)
         # ====================================================================
         # LPDDR5 uses VDD2L for some termination schemes
-        p_term_vdd2l = (rd_duty + wr_duty) * dq_width * 0.5 * vdd2l * vdd2l / rtt_dq
+        # Guard against division by zero or negative power
+        if rtt_dq > 0:
+            p_term_vdd2l = max(0.0, (rd_duty + wr_duty) * dq_width * 0.5 * vdd2l * vdd2l / rtt_dq)
+        else:
+            p_term_vdd2l = 0.0
         
         # ====================================================================
         # 6) Total interface power by rail
