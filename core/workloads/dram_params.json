@@ -15,6 +15,7 @@
         "nbrOfBanks": 16,
         "nbrOfRanks": 1,
         "nbrOfDevices": 8,
+        "nbrOfDBs": 8,
         "RefMode": 1
     },
     "mempowerspec": {

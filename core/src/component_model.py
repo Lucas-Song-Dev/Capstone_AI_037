@@ -12,16 +12,12 @@ class DDR5ComponentPowerModel:
         p = memspec.mempowerspec
         t = memspec.memtimingspec
 
+        # NOTE: RCD and data buffers use different IDD values than DRAM. However, unable
+        # to find any datasheets with these IDD values, so will use the almost equivalent DRAM IDD
+        # values for now.
+
         # Voltages
         vdd = p.vdd
-        vpp = p.vpp
-
-        # Basic timing in seconds
-        tCK = t.tCK
-        tRAS = t.RAS * tCK
-        tRP = t.RP * tCK
-        tRFC1_s = t.RFC1 * tCK
-        tREFI_s = t.REFI * tCK
 
         # Convert workload percentages to fractions (0–1)
         BNK_PRE_frac    = workload.BNK_PRE_percent / 100.0
@@ -34,13 +30,19 @@ class DDR5ComponentPowerModel:
         # --------------------------------------------------------------------
         # 1) Register Clock Driver Power
         # --------------------------------------------------------------------
-        if memspec.registered:
-            P_RCD = ((p.idd4w * WR_frac) + (p.idd4r) * RD_frac) * vdd
+        if not memspec.registered:
+            P_RCD = 0
+        else:
+            P_RCD = (((1 - CKE_LO_ACT_frac) * p.idd3n) + 
+                           ((p.idd4w - p.idd3n) * WR_frac) + 
+                           (p.idd4r - p.idd3n) * RD_frac) * vdd
 
         # --------------------------------------------------------------------
         # 2) Data Buffer Power
         # --------------------------------------------------------------------
-        P_DB = nbrOfDBs * ((p.idd4w * WR_frac) + (p.idd4r) * RD_frac) * vdd
+        P_DB = nbrOfDBs * (((1 - CKE_LO_ACT_frac) * p.idd3n) + 
+                           ((p.idd4w - p.idd3n) * WR_frac) + 
+                           (p.idd4r - p.idd3n) * RD_frac) * vdd
 
         # --------------------------------------------------------------------
         # 5) Aggregate
