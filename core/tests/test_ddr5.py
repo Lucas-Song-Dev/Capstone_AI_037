@@ -66,7 +66,7 @@ class TestDDR5:
         workload = load_workload(str(sample_workload_path))
         
         dimm = DIMM.load_specs(str(sample_memspec_path), str(sample_workload_path), core_model=core_model)
-        result = dimm.compute_core()
+        result = dimm.compute_all()
         
         assert result is not None
         assert "P_total_core" in result
@@ -80,7 +80,7 @@ class TestDDR5:
         workload = load_workload(str(sample_workload_path))
         
         dimm = DIMM.load_specs(str(sample_memspec_path), str(sample_workload_path), interface_model=interface_model)
-        result = dimm.compute_interface()
+        result = dimm.compute_all()
         
         assert result is not None
         assert "P_total_interface" in result
