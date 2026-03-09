@@ -149,6 +149,7 @@ class DIMM:
         print(f"Banks: {arch.nbrOfBanks}  |  Bank Groups: {arch.nbrOfBankGroups}")
         print(f"Rows: {arch.nbrOfRows}  |  Columns: {arch.nbrOfColumns}")
         print(f"Ranks: {arch.nbrOfRanks}  |  # of DRAM devices (modeled): {len(self.dram_list)}")
+        print(f"Data buffers: {arch.nbrOfDBs}")
 
         # ---- Core power ----
         print("---- Core Power Breakdown (W) ----")
@@ -204,9 +205,20 @@ class DIMM:
             print(f"{'P_total_interface':22s}: {self.interfacepower['P_total_interface']:.4f}")
         print()
 
+        print("---- Component Power Breakdown (W) ----")
+        for k in [
+            "P_RCD",
+            "P_DB",
+            "P_total_cmp",
+        ]:
+            if k in self.componentpower:
+                print(f"{k:22s}: {self.componentpower[k]:.4f}")
+        print()
+
         # ---- Totals ----
         print("---- Total(W) ---- ")
         print(f"P_total_core          : {self.totalpower['P_total_core']:.4f}")
         print(f"P_total_interface     : {self.totalpower['P_total_interface']:.4f}")
+        print(f"P_total_component     : {self.totalpower['P_total_component']:.4f}")
         print(f"P_TOTAL               : {self.totalpower['P_total']:.4f}")
         print("\n===================================================\n")

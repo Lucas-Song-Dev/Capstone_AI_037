@@ -8,7 +8,8 @@ class DDR5ComponentPowerModel:
     Stateless: given memspec/workload, return a breakdown dictionary.
     """
 
-    def compute(self, memspec: MemSpec, workload: Workload, nbrOfDBs: int) -> Dict[str, float]:
+    def compute(self, memspec: MemSpec, workload: Workload) -> Dict[str, float]:
+        a = memspec.memarchitecturespec
         p = memspec.mempowerspec
         t = memspec.memtimingspec
 
@@ -40,7 +41,7 @@ class DDR5ComponentPowerModel:
         # --------------------------------------------------------------------
         # 2) Data Buffer Power
         # --------------------------------------------------------------------
-        P_DB = nbrOfDBs * (((1 - CKE_LO_ACT_frac) * p.idd3n) + 
+        P_DB = a.nbrOfDBs * (((1 - CKE_LO_ACT_frac) * p.idd3n) + 
                            ((p.idd4w - p.idd3n) * WR_frac) + 
                            (p.idd4r - p.idd3n) * RD_frac) * vdd
 
