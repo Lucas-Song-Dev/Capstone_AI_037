@@ -11,9 +11,9 @@ project_root = Path(__file__).parent.parent.parent
 core_src = project_root / "core" / "src"
 sys.path.insert(0, str(core_src))
 
-# Add backend/src to path
-backend_src = project_root / "backend" / "src"
-sys.path.insert(0, str(backend_src))
+# Add api to path (main.py is in api/)
+api_path = project_root / "api"
+sys.path.insert(0, str(api_path))
 
 
 @pytest.fixture

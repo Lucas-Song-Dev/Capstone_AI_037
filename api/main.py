@@ -1,5 +1,5 @@
 """
-FastAPI backend for DDR5 Power Calculator.
+FastAPI API for DDR5 Power Calculator.
 
 This API provides endpoints for DDR5 power calculations that can be called
 from the Next.js frontend deployed on Vercel.
@@ -14,8 +14,8 @@ import os
 from pathlib import Path
 
 # Add core/src directory to path to import the package
-# Get the project root (three levels up from backend/src/)
-project_root = Path(__file__).parent.parent.parent
+# Project root is two levels up from api/main.py
+project_root = Path(__file__).parent.parent
 core_src_path = project_root / "core" / "src"
 sys.path.insert(0, str(core_src_path))
 
@@ -241,9 +241,7 @@ async def calculate_interface_power(request: PowerCalculationRequest):
         workload = workload_model_to_obj(request.workload)
         
         interface_model = DDR5InterfacePowerModel()
-        ddr5 = DDR5(memspec, workload, interface_model=interface_model)
-        
-        result = ddr5.compute_interface()
+        result = interface_model.compute(memspec, workload)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -252,7 +250,7 @@ async def calculate_interface_power(request: PowerCalculationRequest):
 @app.post("/api/calculate/all", response_model=Dict[str, float])
 async def calculate_all_power(request: PowerCalculationRequest):
     """
-    Calculate both core and interface power consumption.
+    Calculate both core and interface power consumption (single device).
     
     Returns a dictionary with complete power breakdown values in Watts.
     """
@@ -262,9 +260,14 @@ async def calculate_all_power(request: PowerCalculationRequest):
         
         core_model = DDR5CorePowerModel()
         interface_model = DDR5InterfacePowerModel()
-        ddr5 = DDR5(memspec, workload, core_model=core_model, interface_model=interface_model)
+        ddr5 = DDR5(memspec, workload, core_model=core_model)
+        core_result = ddr5.compute_core()
+        interface_result = interface_model.compute(memspec, workload)
         
-        result = ddr5.compute_all()
+        result = dict(core_result)
+        result.update(interface_result)
+        result["P_total_interface"] = interface_result.get("P_total_interface", 0.0)
+        result["P_total"] = core_result.get("P_total_core", 0.0) + result["P_total_interface"]
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -281,20 +284,14 @@ async def calculate_dimm_power(request: PowerCalculationRequest):
         memspec = memspec_model_to_obj(request.memspec)
         workload = workload_model_to_obj(request.workload)
         
-        # Create DIMM with multiple DRAM devices
         core_model = DDR5CorePowerModel()
         interface_model = DDR5InterfacePowerModel()
-        
-        nbr_of_devices = memspec.memarchitecturespec.nbrOfDevices or 1
-        dram_list = []
-        
-        for _ in range(nbr_of_devices):
-            dram = DDR5(memspec, workload, core_model=core_model, interface_model=interface_model)
-            dram_list.append(dram)
-        
-        dimm = DIMM(memspec, workload, dram_list)
+        dimm = DIMM.from_memspec(
+            memspec, workload,
+            core_model=core_model,
+            interface_model=interface_model,
+        )
         result = dimm.compute_all()
-        
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -303,4 +300,3 @@ async def calculate_dimm_power(request: PowerCalculationRequest):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-

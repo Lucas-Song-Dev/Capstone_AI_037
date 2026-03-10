@@ -1,5 +1,5 @@
 """
-End-to-end tests that verify integration between core, backend, and frontend.
+End-to-end tests that verify integration between core, API, and frontend.
 """
 
 import pytest
@@ -7,10 +7,10 @@ import sys
 from pathlib import Path
 from fastapi.testclient import TestClient
 
-# Add backend/src to path
+# Add api to path (main.py is in api/)
 project_root = Path(__file__).parent.parent.parent
-backend_src = project_root / "backend" / "src"
-sys.path.insert(0, str(backend_src))
+api_path = project_root / "api"
+sys.path.insert(0, str(api_path))
 
 
 class TestFullStackIntegration:
@@ -53,7 +53,7 @@ class TestFullStackIntegration:
         assert result["P_total_core"] > 0
     
     def test_backend_api_uses_core(self, api_client, sample_memspec_path, sample_workload_path, core_modules):
-        """Test that backend API correctly uses core package."""
+        """Test that API correctly uses core package."""
         import json
         
         load_memspec = core_modules["load_memspec"]
@@ -139,7 +139,7 @@ class TestFullStackIntegration:
         assert result["P_total_core"] > 0
     
     def test_end_to_end_flow(self, core_modules, api_client, sample_memspec_path, sample_workload_path):
-        """Test complete end-to-end flow: core -> backend -> response."""
+        """Test complete end-to-end flow: core -> API -> response."""
         # Step 1: Core package can load and compute
         load_memspec = core_modules["load_memspec"]
         load_workload = core_modules["load_workload"]

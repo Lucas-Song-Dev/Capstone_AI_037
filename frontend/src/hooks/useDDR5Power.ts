@@ -1,6 +1,11 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { MemSpec, Workload, PowerResult, DIMMPowerResult } from '@/lib/types';
 import { computeCorePower, computeDIMMPower } from '@/lib/ddr5Calculator';
+import {
+  isApiAvailable,
+  fetchCorePower,
+  fetchDIMMPower,
+} from '@/lib/api';
 
 interface UseDDR5PowerOptions {
   debounceMs?: number;
@@ -31,28 +36,34 @@ export function useDDR5Power(
   const calculate = useCallback(() => {
     if (!memspec || !workload) {
       setPowerResult(null);
+      setDimmPowerResult(null);
       return;
     }
 
     setIsCalculating(true);
     setError(null);
 
-    // Clear any pending calculation
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
 
-    timeoutRef.current = setTimeout(() => {
+    const runCalculation = async () => {
       try {
-        const coreResult = computeCorePower(memspec, workload);
-        setPowerResult(coreResult);
-        
-        // Calculate DIMM power
-        const dimmResult = computeDIMMPower(coreResult, memspec, {
-          isRDIMM: false, // Default to UDIMM, can be made configurable
-        });
-        setDimmPowerResult(dimmResult);
-        
+        if (isApiAvailable()) {
+          const [coreResult, dimmResult] = await Promise.all([
+            fetchCorePower(memspec, workload),
+            fetchDIMMPower(memspec, workload),
+          ]);
+          setPowerResult(coreResult);
+          setDimmPowerResult(dimmResult);
+        } else {
+          const coreResult = computeCorePower(memspec, workload);
+          setPowerResult(coreResult);
+          const dimmResult = computeDIMMPower(coreResult, memspec, {
+            isRDIMM: false,
+          });
+          setDimmPowerResult(dimmResult);
+        }
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Calculation failed'));
@@ -61,7 +72,9 @@ export function useDDR5Power(
       } finally {
         setIsCalculating(false);
       }
-    }, debounceMs);
+    };
+
+    timeoutRef.current = setTimeout(runCalculation, debounceMs);
   }, [memspec, workload, debounceMs]);
 
   // Auto-calculate when inputs change

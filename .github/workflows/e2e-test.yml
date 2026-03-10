@@ -5,7 +5,7 @@ on:
     branches: [ main, master, fullstack ]
     paths:
       - 'core/**'
-      - 'backend/**'
+      - 'api/**'
       - 'frontend/**'
       - 'tests/**'
       - '.github/workflows/e2e-test.yml'
@@ -13,7 +13,7 @@ on:
     branches: [ main, master, fullstack ]
     paths:
       - 'core/**'
-      - 'backend/**'
+      - 'api/**'
       - 'frontend/**'
       - 'tests/**'
   workflow_dispatch:
@@ -45,9 +45,9 @@ jobs:
         pip install -e .
         pip install -r requirements.txt
     
-    - name: Install backend dependencies
+    - name: Install API dependencies
       run: |
-        cd backend
+        cd api
         pip install -r requirements.txt
         pip install pytest pytest-cov fastapi[all]
     

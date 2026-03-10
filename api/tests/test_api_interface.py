@@ -36,4 +36,3 @@ def test_calculate_dimm_power(client, sample_memspec, sample_workload):
     
     assert result is not None
     assert isinstance(result, dict)
-

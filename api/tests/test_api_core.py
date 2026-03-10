@@ -58,4 +58,3 @@ def test_calculate_all_power(client, sample_memspec, sample_workload):
     assert "P_total_core" in result
     assert "P_total_interface" in result
     assert "P_total" in result
-
