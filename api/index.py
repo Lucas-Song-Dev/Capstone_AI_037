@@ -13,10 +13,7 @@ project_root = Path(__file__).parent.parent
 core_src_path = project_root / "core" / "src"
 sys.path.insert(0, str(core_src_path))
 
-# Add backend/src to path for main.py  
-backend_src_path = project_root / "backend" / "src"
-sys.path.insert(0, str(backend_src_path))
-
+# main.py is in the same directory (api/)
 from main import app
 from mangum import Mangum
 

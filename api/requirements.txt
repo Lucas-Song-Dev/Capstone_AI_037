@@ -1,12 +1,9 @@
-# Backend API Dependencies
+# API Dependencies
 # FastAPI and server dependencies
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 pydantic>=2.0.0
 mangum>=0.17.0
 
-# Core package dependencies
-pandas>=2.0.0
-matplotlib>=3.7.0
-numpy>=1.24.0
-
+# Core package dependencies (installed separately via pip install -e ../core)
+# pandas, numpy, matplotlib are included in core package

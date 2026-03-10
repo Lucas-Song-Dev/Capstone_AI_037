@@ -4,13 +4,13 @@
     "memoryType": "DDR5",
     "notes": "Spec derived from https://gzhls.at/blob/ldb/b/e/5/8/5bc212f7c92604fd3737505ee4c96014733c.pdf at 4800 MT/s",
     "memarchitecturespec": {
-      "width": 8,
+      "width": 16,
       "nbrOfBanks": 32,
       "nbrOfBankGroups": 8,
       "nbrOfRanks": 1,
       "nbrOfColumns": 1024,
       "nbrOfRows": 65536,
-      "nbrOfDevices": 4,
+      "nbrOfDevices": 2,
       "burstLength": 16,
       "dataRate": 2,
       "page_size_KB": 1

@@ -7,10 +7,10 @@ from fastapi.testclient import TestClient
 import sys
 from pathlib import Path
 
-# Add backend/src to path
+# Add api to path (main.py is in api/)
 project_root = Path(__file__).parent.parent.parent
-backend_src = project_root / "backend" / "src"
-sys.path.insert(0, str(backend_src))
+api_path = project_root / "api"
+sys.path.insert(0, str(api_path))
 
 # Import will be done in test functions
 

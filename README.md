@@ -1,6 +1,6 @@
 # DDR5 Power Calculator
 
-JEDEC-compliant DDR5 power modeling and calculation tool with Next.js frontend and FastAPI backend.
+JEDEC-compliant DDR5 power modeling and calculation tool with Next.js frontend and FastAPI API.
 
 ## Project Structure
 
@@ -11,8 +11,9 @@ JEDEC-compliant DDR5 power modeling and calculation tool with Next.js frontend a
 │   ├── tests/              # Unit tests
 │   ├── verif/              # Verification tests
 │   └── workloads/          # Test data
-├── backend/                 # FastAPI API
-│   ├── src/                # API source code
+├── api/                     # FastAPI API
+│   ├── main.py             # API application
+│   ├── index.py            # Vercel serverless entry
 │   └── tests/              # API tests
 ├── frontend/                # Next.js frontend
 │   ├── src/                # Frontend source
@@ -31,16 +32,16 @@ pip install -e .
 python test_regression.py
 ```
 
-### Backend API
+### API
 
 ```bash
 # Install core first
 cd core && pip install -e . && cd ..
 
-# Install backend dependencies
-cd backend
+# Install API dependencies
+cd api
 pip install -r requirements.txt
-uvicorn src.main:app --reload
+uvicorn main:app --reload
 ```
 
 ### Frontend
@@ -56,7 +57,7 @@ npm run dev
 Each component has its own test suite:
 
 - **Core**: `cd core && pytest tests/`
-- **Backend**: `cd backend && pytest tests/`
+- **API**: `cd api && pytest tests/`
 - **Frontend**: `cd frontend && npm test`
 - **E2E**: `pytest tests/e2e/`
 
@@ -72,18 +73,18 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
 
 Work directly in `core/src/`. The package can be installed with `pip install -e core/`.
 
-### Backend Development
+### API Development
 
-Work in `backend/src/`. The backend imports the core package.
+Work in `api/`. The API imports the core package.
 
 ### Frontend Development
 
-Work in `frontend/src/`. The frontend calls backend API endpoints.
+Work in `frontend/src/`. The frontend calls API endpoints when `NEXT_PUBLIC_API_URL` is set.
 
 ## GitHub Actions
 
 - `core-test.yml` - Tests core package
-- `backend-test.yml` - Tests backend API
+- `backend-test.yml` - Tests API (api/)
 - `frontend-test.yml` - Tests frontend
 - `e2e-test.yml` - Tests full stack integration
 

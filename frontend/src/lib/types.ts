@@ -7,6 +7,8 @@ export interface MemArchitectureSpec {
   nbrOfRanks: number;
   nbrOfColumns: number;
   nbrOfRows: number;
+  /** Number of DRAM devices per subchannel (e.g. 4 for x8 32-bit). Backend/core use this for DIMM and interface models. */
+  nbrOfDevices?: number;
   burstLength: number;
   dataRate: number;
 }
