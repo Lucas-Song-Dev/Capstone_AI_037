@@ -11,6 +11,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List, Sequence
 
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
 # Add src directory to import path (same pattern used in verif.py)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
@@ -20,7 +25,7 @@ from dimm import DIMM
 @dataclass
 class PerturbationResult:
 	field_path: str
-	direction: str
+	perturbation_percent: float
 	original_value: float
 	modified_value: float
 	original_power: float
@@ -59,7 +64,19 @@ def parse_args() -> argparse.Namespace:
 		"--delta",
 		type=float,
 		default=10.0,
-		help="Percent change applied for +/- perturbation sweep (default: 10)",
+		help="Max percent for perturbation sweep range [-delta, +delta] (default: 10)",
+	)
+	parser.add_argument(
+		"--sweep-points",
+		type=int,
+		default=21,
+		help="Number of evenly spaced points in the sweep (default: 21)",
+	)
+	parser.add_argument(
+		"--plot-dir",
+		type=str,
+		default=str(Path(__file__).resolve().parent / "profile_model"),
+		help="Directory where per-parameter PNG plots are saved",
 	)
 	parser.add_argument(
 		"--output-file",
@@ -155,6 +172,10 @@ def format_path(path: Sequence[str]) -> str:
 	return ".".join(path)
 
 
+def format_perturbation_label(perturbation_percent: float) -> str:
+	return f"{perturbation_percent:+.3f}%"
+
+
 def print_top_impacts(results: List[PerturbationResult], top_k: int = 15) -> None:
 	"""Print ranking of fields by maximum absolute percent impact."""
 	grouped: dict[str, List[PerturbationResult]] = {}
@@ -177,11 +198,48 @@ def print_top_impacts(results: List[PerturbationResult], top_k: int = 15) -> Non
 	print("-" * 170)
 
 	for idx, (field_path, max_item, _) in enumerate(ranked[:top_k], start=1):
+		perturbation_label = format_perturbation_label(max_item.perturbation_percent)
 		print(
-			f"{idx:<6} {field_path:<45} {max_item.direction:<20} {max_item.delta_percent:>10.4f} "
+			f"{idx:<6} {field_path:<45} {perturbation_label:<20} {max_item.delta_percent:>10.4f} "
 			f"{max_item.original_value:>14.6g} {max_item.modified_value:>14.6g} "
 			f"{max_item.original_power:>18.6f} {max_item.perturbed_power:>20.6f}"
 		)
+
+
+def save_parameter_plot(
+	output_dir: Path,
+	field_name: str,
+	baseline_total: float,
+	field_results: List[PerturbationResult],
+) -> Path:
+	"""Save a per-parameter perturbation curve as a PNG."""
+	sorted_results = sorted(field_results, key=lambda item: item.perturbation_percent)
+	x_values = [item.perturbation_percent for item in sorted_results]
+	y_values = [item.perturbed_power for item in sorted_results]
+
+	plt.figure(figsize=(9, 5))
+	plt.plot(x_values, y_values, marker="o", linewidth=1.5)
+	plt.axhline(baseline_total, color="gray", linestyle="--", linewidth=1.0)
+	plt.axvline(0.0, color="gray", linestyle=":", linewidth=1.0)
+	plt.grid(True, linestyle=":", linewidth=0.8, alpha=0.7)
+	plt.xlabel("Perturbation (%)")
+	plt.ylabel("P_total (W)")
+	plt.title(f"P_total sensitivity: {field_name}\\nBaseline P_total = {baseline_total:.6f} W")
+	plt.tight_layout()
+
+	filename = sanitize_for_filename(f"{field_name}.png")
+	output_path = output_dir / filename
+	plt.savefig(output_path, dpi=180)
+	plt.close()
+	return output_path
+
+
+def has_power_variation(field_results: List[PerturbationResult], tolerance: float = 1e-12) -> bool:
+	"""Return True when P_total changes across perturbation points."""
+	if not field_results:
+		return False
+	powers = [item.perturbed_power for item in field_results]
+	return (max(powers) - min(powers)) > tolerance
 
 
 def save_full_results(
@@ -189,7 +247,8 @@ def save_full_results(
 	memspec_path: Path,
 	workload_path: Path,
 	baseline_total: float,
-	perturbation_percent: float,
+	max_perturbation_percent: float,
+	sweep_points: int,
 	results: List[PerturbationResult],
 	skipped_fields: List[str],
 ) -> None:
@@ -201,7 +260,8 @@ def save_full_results(
 		"memspec_path": str(memspec_path),
 		"workload_path": str(workload_path),
 		"baseline_total": baseline_total,
-		"perturbation_percent": perturbation_percent,
+		"max_perturbation_percent": max_perturbation_percent,
+		"sweep_points": sweep_points,
 		"result_count": len(results),
 		"results": [
 			{
@@ -225,19 +285,26 @@ def main() -> None:
 	memspec_path = resolve_json_path(args.memspec, "--memspec")
 	workload_path = resolve_json_path(args.workload, "--workload")
 
-	if args.delta <= 0 or args.delta >= 100:
-		raise ValueError("--delta must be > 0 and < 100.")
+	if args.delta <= 0:
+		raise ValueError("--delta must be > 0.")
+	if args.sweep_points < 2:
+		raise ValueError("--sweep-points must be >= 2.")
 
 	perturbation_percent = args.delta
-	perturbation_fraction = perturbation_percent / 100.0
-	percent_label = f"{perturbation_percent:g}%"
-	perturbation_cases = [
-		(1.0 + perturbation_fraction, f"+{percent_label}"),
-		(1.0 - perturbation_fraction, f"-{percent_label}"),
+	plot_dir = Path(args.plot_dir).expanduser().resolve()
+	plot_dir.mkdir(parents=True, exist_ok=True)
+
+	step_count = args.sweep_points - 1
+	step_size = (2.0 * perturbation_percent) / step_count
+	perturbation_values = [
+		(-perturbation_percent + (idx * step_size))
+		for idx in range(args.sweep_points)
 	]
 
 	print("\n[INFO] Running baseline model...")
-	print(f"[INFO] Perturbation setting: +/- {percent_label}")
+	print(f"[INFO] Perturbation sweep: {perturbation_values[0]:+.3f}% to {perturbation_values[-1]:+.3f}%")
+	print(f"[INFO] Sweep points: {args.sweep_points}")
+	print(f"[INFO] Plot output directory: {plot_dir}")
 	baseline_total = run_model_total_power(memspec_path, workload_path)
 	print(f"[INFO] Baseline P_total: {baseline_total:.6f} W")
 
@@ -259,15 +326,18 @@ def main() -> None:
 		for idx, path_tokens in enumerate(numeric_paths, start=1):
 			field_name = format_path(path_tokens)
 			original_value = get_value_at_path(memspec_raw["memspec"], path_tokens)
+			field_results: List[PerturbationResult] = []
 
 			print(f"\n[{idx}/{len(numeric_paths)}] Profiling field: {field_name}")
 
-			for factor, direction in perturbation_cases:
+			for perturbation_value in perturbation_values:
+				factor = 1.0 + (perturbation_value / 100.0)
 				modified = copy.deepcopy(memspec_raw)
 				modified_value = scaled_value(original_value, factor)
 				set_value_at_path(modified["memspec"], path_tokens, modified_value)
 
-				temp_name = sanitize_for_filename(f"{field_name}_{direction}.json")
+				label = format_perturbation_label(perturbation_value)
+				temp_name = sanitize_for_filename(f"{field_name}_{label}.json")
 				temp_path = temp_dir_path / temp_name
 				with open(temp_path, "w", encoding="utf-8") as f:
 					json.dump(modified, f, indent=2)
@@ -275,30 +345,44 @@ def main() -> None:
 				try:
 					new_total = run_model_total_power(temp_path, workload_path)
 				except Exception as exc:
-					skipped_fields.append(f"{field_name} ({direction}): {exc}")
-					print(f"  [SKIP] {direction} failed: {exc}")
+					skipped_fields.append(f"{field_name} ({label}): {exc}")
+					print(f"  [SKIP] {label} failed: {exc}")
 					continue
 
 				delta_watts = new_total - baseline_total
 				delta_percent = (delta_watts / baseline_total * 100.0) if baseline_total != 0 else 0.0
 
-				results.append(
-					PerturbationResult(
-						field_path=field_name,
-						direction=direction,
-						original_value=float(original_value),
-						modified_value=float(modified_value),
-						original_power=baseline_total,
-						perturbed_power=new_total,
-						delta_watts=delta_watts,
-						delta_percent=delta_percent,
-					)
+				point_result = PerturbationResult(
+					field_path=field_name,
+					perturbation_percent=perturbation_value,
+					original_value=float(original_value),
+					modified_value=float(modified_value),
+					original_power=baseline_total,
+					perturbed_power=new_total,
+					delta_watts=delta_watts,
+					delta_percent=delta_percent,
 				)
+				results.append(point_result)
+				field_results.append(point_result)
 
 				print(
-					f"  {direction:<4} -> Base={baseline_total:.6f} W, Perturbed={new_total:.6f} W "
+					f"  {label:<8} -> Base={baseline_total:.6f} W, Perturbed={new_total:.6f} W "
 					f"(Delta {delta_watts:+.6f} W, {delta_percent:+.4f}%)"
 				)
+
+			if field_results:
+				if has_power_variation(field_results):
+					plot_path = save_parameter_plot(
+						output_dir=plot_dir,
+						field_name=field_name,
+						baseline_total=baseline_total,
+						field_results=field_results,
+					)
+					print(f"  [PLOT] Saved: {plot_path}")
+				else:
+					print("  [PLOT] Skipped: no power change across perturbation range.")
+			else:
+				print("  [PLOT] Skipped: no successful perturbation points for this field.")
 
 	if results:
 		print_top_impacts(results, top_k=args.top_k)
@@ -317,7 +401,8 @@ def main() -> None:
 			memspec_path=memspec_path,
 			workload_path=workload_path,
 			baseline_total=baseline_total,
-			perturbation_percent=perturbation_percent,
+			max_perturbation_percent=perturbation_percent,
+			sweep_points=args.sweep_points,
 			results=results,
 			skipped_fields=skipped_fields,
 		)
