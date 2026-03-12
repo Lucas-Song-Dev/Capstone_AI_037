@@ -28,13 +28,16 @@ class DIMM:
         self.component_model = component_model
 
     @classmethod
-    def load_specs(cls, memspec_path: str, workload_path: str):
+    def load_specs(cls, memspec_path: str, workload_path: str, core_model=None, interface_model=None, dram_cls=DDR5):
         memspec = load_memspec(memspec_path)
         workload = load_workload(workload_path)
 
-        core_model = DDR5CorePowerModel()
-        interface_model = DDR5InterfacePowerModel()
-        component_model = DDR5ComponentPowerModel()
+        if core_model is None:
+            core_model = DDR5CorePowerModel()
+        if interface_model is None:
+            interface_model = DDR5InterfacePowerModel()
+        if component_model is None:
+            component_model = DDR5ComponentPowerModel()
 
         dimm = cls.from_memspec(
             memspec,
@@ -42,8 +45,8 @@ class DIMM:
             core_model=core_model,
             interface_model=interface_model,
             component_model=component_model
+            dram_cls=dram_cls,
         )
-
         return dimm
 
     def _infer_devices_per_rank(device_width_bits: int, nbr_of_devices_field: int, num_subchannels: int) -> int:
@@ -72,6 +75,7 @@ class DIMM:
         core_model: Optional[DDR5CorePowerModel] = None,
         interface_model: Optional[DDR5InterfacePowerModel] = None,
         component_model: Optional[DDR5ComponentPowerModel] = None,
+        dram_cls=DDR5,
         num_subchannels: int = 2,
     ):
         core_model = core_model or DDR5CorePowerModel()
@@ -89,7 +93,7 @@ class DIMM:
 
         # generate a list of DRAM devices for the DIMM
         # if some device are running at different frequencies, we could extend this to take a list of memspecs and workloads per device
-        dram_list = [DDR5(memspec, workload, core_model=core_model) for _ in range(total_devices)]
+        dram_list = [dram_cls(memspec, workload, core_model=core_model) for _ in range(total_devices)]
 
         # Note that interface power is computed once per DIMM, not per device, since it's a shared bus property.
         return cls(memspec, workload, dram_list, interface_model=interface_model, component_model=component_model)
@@ -139,72 +143,99 @@ class DIMM:
         if self.corepower is None or self.interfacepower is None or self.componentpower is None:
             raise RuntimeError("Must call compute_all() before report_power()")
 
-        print("\n================ DIMM POWER REPORT ================\n")
+        print("\n" + "="*70)
+        print("DIMM POWER REPORT")
+        print("="*70)
 
         # ---- MemSpec summary ----
         arch = self.memspec.memarchitecturespec
+        mem_type = str(self.memspec.memoryType).upper()
         print("Memory:", self.memspec.memoryId)
-        print("Type:", self.memspec.memoryType)
+        print("Type:", mem_type)
         print(f"Device width: x{arch.width}")
         print(f"Banks: {arch.nbrOfBanks}  |  Bank Groups: {arch.nbrOfBankGroups}")
         print(f"Rows: {arch.nbrOfRows}  |  Columns: {arch.nbrOfColumns}")
         print(f"Ranks: {arch.nbrOfRanks}  |  # of DRAM devices (modeled): {len(self.dram_list)}")
         print(f"Data buffers: {arch.nbrOfDBs}")
+        print()
 
         # ---- Core power ----
-        print("---- Core Power Breakdown (W) ----")
-        for k in [
+        print("--- Core Power Breakdown (W) ---")
+        # Common components first
+        common_keys = [
             "P_PRE_STBY_core",
             "P_ACT_STBY_core",
             "P_ACT_PRE_core",
             "P_RD_core",
             "P_WR_core",
             "P_REF_core",
-            "P_VDD_core",
-            "P_VPP_core",
-            "P_total_core",
-        ]:
+        ]
+        for k in common_keys:
             if k in self.corepower:
-                print(f"{k:22s}: {self.corepower[k]:.4f}")
+                print(f"  {k:30s}: {self.corepower[k]:12.6f}")
+        
+        # Memory-type-specific rails
+        if "DDR5" in mem_type and "LPDDR5" not in mem_type:
+            # DDR5: VDD + VPP rails
+            for k in ["P_VDD_core", "P_VPP_core"]:
+                if k in self.corepower:
+                    print(f"  {k:30s}: {self.corepower[k]:12.6f}")
+        else:
+            # LPDDR5/LPDDR5X: 4 rails
+            for k in ["P_background", "P_SELFREF"]:
+                if k in self.corepower:
+                    print(f"  {k:30s}: {self.corepower[k]:12.6f}")
+            print("  --- By Rail ---")
+            for k in ["P_VDD1", "P_VDD2H", "P_VDD2L", "P_VDDQ"]:
+                if k in self.corepower:
+                    print(f"  {k:30s}: {self.corepower[k]:12.6f}")
+        
+        if "P_total_core" in self.corepower:
+            print(f"  {'-'*44}")
+            print(f"  {'P_total_core':30s}: {self.corepower['P_total_core']:12.6f}")
         print()
 
         # ---- Interface power ----
-        print("---- Interface / I/O Power Breakdown (W) ----")
-        print("  [Static / Termination]")
-        for k in [
-            "P_DQ_WRITE",
-            "P_DQ_READ",
-            "P_CA",
-            "P_CK",
-            "P_WCK",
-            "P_DQS",
-            "P_CS",
-        ]:
-            if k in self.interfacepower:
-                print(f"{k:22s}: {self.interfacepower[k]:.4f}")
-        if "P_total_interface_term" in self.interfacepower:
-            print(f"{'P_total_interface_term':22s}: {self.interfacepower['P_total_interface_term']:.4f}")
-        print()
+        print("--- Interface / I/O Power Breakdown (W) ---")
+        
+        # Check if this is DDR5 (has termination breakdown) or LPDDR5 (has rail breakdown)
+        has_ddr5_interface = "P_DQ_WRITE" in self.interfacepower
+        has_lpddr5_interface = "P_CA_VDD1" in self.interfacepower
+        
+        if has_ddr5_interface:
+            # DDR5 interface model output
+            print("  [Termination Power]")
+            for k in ["P_DQ_WRITE", "P_DQ_READ", "P_CA", "P_CK", "P_WCK", "P_DQS", "P_CS"]:
+                if k in self.interfacepower:
+                    print(f"    {k:28s}: {self.interfacepower[k]:12.6f}")
+            if "P_total_interface_term" in self.interfacepower:
+                print(f"    {'P_total_interface_term':28s}: {self.interfacepower['P_total_interface_term']:12.6f}")
+            print()
 
-        print("  [Dynamic / CV^2 f]")
-        for k in [
-            "P_dyn_dq_W",
-            "P_dyn_ca_W",
-            "P_dyn_cs_W",
-            "P_dyn_ck_W",
-            "P_dyn_dqs_W",
-            "P_dyn_wck_W",
-        ]:
-            if k in self.interfacepower:
-                print(f"{k:22s}: {self.interfacepower[k]:.4f}")
-        if "P_total_interface_dyn" in self.interfacepower:
-            print(f"{'P_total_interface_dyn':22s}: {self.interfacepower['P_total_interface_dyn']:.4f}")
+            print("  [Dynamic Power (CV²f)]")
+            for k in ["P_dyn_dq_W", "P_dyn_ca_W", "P_dyn_cs_W", "P_dyn_ck_W", "P_dyn_dqs_W", "P_dyn_wck_W"]:
+                if k in self.interfacepower:
+                    print(f"    {k:28s}: {self.interfacepower[k]:12.6f}")
+            if "P_total_interface_dyn" in self.interfacepower:
+                print(f"    {'P_total_interface_dyn':28s}: {self.interfacepower['P_total_interface_dyn']:12.6f}")
+        
+        elif has_lpddr5_interface:
+            # LPDDR5 interface model output (by rail)
+            print("  [By Signal Type & Rail]")
+            for k in ["P_CA_VDD1", "P_CK_VDD1", "P_DQ_VDDQ", "P_DQS_VDDQ", "P_TERM_VDD2L"]:
+                if k in self.interfacepower:
+                    print(f"    {k:28s}: {self.interfacepower[k]:12.6f}")
+            print("  [By Rail Total]")
+            for k in ["P_VDD1", "P_VDDQ", "P_VDD2L"]:
+                if k in self.interfacepower:
+                    print(f"    {k:28s}: {self.interfacepower[k]:12.6f}")
+        
         print()
-
         if "P_total_interface" in self.interfacepower:
-            print(f"{'P_total_interface':22s}: {self.interfacepower['P_total_interface']:.4f}")
+            print(f"  {'-'*44}")
+            print(f"  {'P_total_interface':30s}: {self.interfacepower['P_total_interface']:12.6f}")
         print()
-
+        
         print("---- Component Power Breakdown (W) ----")
         for k in [
             "P_RCD",
@@ -216,9 +247,10 @@ class DIMM:
         print()
 
         # ---- Totals ----
-        print("---- Total(W) ---- ")
-        print(f"P_total_core          : {self.totalpower['P_total_core']:.4f}")
-        print(f"P_total_interface     : {self.totalpower['P_total_interface']:.4f}")
-        print(f"P_total_component     : {self.totalpower['P_total_component']:.4f}")
-        print(f"P_TOTAL               : {self.totalpower['P_total']:.4f}")
-        print("\n===================================================\n")
+        print("--- DIMM Total Power (W) ---")
+        print(f"  {'P_total_core':30s}: {self.totalpower['P_total_core']:12.6f}")
+        print(f"  {'P_total_interface':30s}: {self.totalpower['P_total_interface']:12.6f}")
+        print(f"  {'P_total_component':30s}: {self.totalpower['P_total_component']:12.6f}")
+        print(f"  {'-'*44}")
+        print(f"  {'P_TOTAL_DIMM':30s}: {self.totalpower['P_total']:12.6f}")
+        print("="*70 + "\n")

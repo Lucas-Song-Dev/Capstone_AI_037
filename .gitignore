@@ -72,3 +72,4 @@ tests/e2e/.pytest_cache/
 
 # Verif temp files
 core/verif/test_inputs/memspec_paths.txt
+core/verif/profile_model/*

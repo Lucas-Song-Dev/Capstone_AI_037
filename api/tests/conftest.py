@@ -1,5 +1,5 @@
 """
-Pytest fixtures for backend API tests.
+Pytest fixtures for API tests.
 """
 
 import pytest
@@ -13,9 +13,9 @@ sys.path.insert(0, str(core_src))
 
 from fastapi.testclient import TestClient
 
-# Add backend/src to path
-backend_src = Path(__file__).parent.parent / "src"
-sys.path.insert(0, str(backend_src))
+# Add api to path (parent of tests) so "from main import app" works
+api_path = Path(__file__).parent.parent
+sys.path.insert(0, str(api_path))
 
 from main import app
 
@@ -96,4 +96,3 @@ def sample_workload():
         "System_tRC_ns": 46.0,
         "tRRDsch_ns": 4.0
     }
-

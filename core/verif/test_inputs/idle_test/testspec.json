@@ -1,0 +1,4 @@
+{
+    "testname": "Idle",
+    "test_function": "test_background_power_sensibility"
+}

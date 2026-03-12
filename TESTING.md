@@ -7,7 +7,7 @@
 | Component | Tests | Status | Pass Rate |
 |-----------|-------|--------|-----------|
 | **Core Package** | 10/10 | ✅ All Passing | 100% |
-| **Backend API** | 7/7 | ✅ All Passing | 100% |
+| **API** | 7/7 | ✅ All Passing | 100% |
 | **Frontend** | 28/28 | ✅ All Passing | 100% |
 | **Total** | **45/45** | ✅ **All Passing** | **100%** |
 
@@ -19,7 +19,7 @@ This project uses automated verification and regression testing to ensure that t
 
 The repository is organized into three main components, each with its own test suite:
 - **Core Package** (`core/`) - Python package for DDR5 power calculations
-- **Backend API** (`backend/`) - FastAPI REST API
+- **API** (`api/`) - FastAPI REST API
 - **Frontend** (`frontend/`) - Next.js React application
 - **End-to-End Tests** (`tests/e2e/`) - Full stack integration tests
 
@@ -51,9 +51,9 @@ The repository is organized into three main components, each with its own test s
 │   ├── tests/               # Unit tests
 │   ├── verif/               # Verification tests
 │   └── workloads/           # Test data
-├── backend/                 # FastAPI API
-│   ├── src/                 # API source code
-│   └── tests/                # API tests
+├── api/                     # FastAPI API
+│   ├── main.py              # API application
+│   └── tests/               # API tests
 ├── frontend/                # Next.js frontend
 │   ├── src/                 # Frontend source
 │   └── tests/                # Frontend tests
@@ -125,18 +125,18 @@ python test_regression.py
 # Activate virtual environment (if not already active)
 .\venv\Scripts\Activate.ps1  # Windows PowerShell
 
-# Install backend dependencies
-cd backend
+# Install API dependencies
+cd api
 pip install -r requirements.txt
 pip install pytest pytest-cov httpx
 
-# Set PYTHONPATH to include both core/src and backend/src
-$env:PYTHONPATH="C:\path\to\core\src;C:\path\to\backend\src"  # Windows PowerShell
+# Set PYTHONPATH to include both core/src and api
+$env:PYTHONPATH="C:\path\to\core\src;C:\path\to\api"  # Windows PowerShell
 ```
 
-**Run backend tests:**
+**Run API tests:**
 ```bash
-cd backend
+cd api
 # With PYTHONPATH set
 pytest tests/ -v
 ```
@@ -214,8 +214,8 @@ cd core
 pip install -e .
 pip install -r requirements.txt
 
-# Install backend dependencies
-cd ../backend
+# Install API dependencies
+cd ../api
 pip install -r requirements.txt
 pip install pytest pytest-cov fastapi[all]
 
@@ -232,7 +232,7 @@ pytest tests/e2e/ -v
 ```
 
 **Test Coverage:**
-- `test_full_stack.py` - Tests complete flow from core → backend → API
+- `test_full_stack.py` - Tests complete flow from core → API → response
 - `test_api_integration.py` - Tests API endpoints and health checks
 - `conftest.py` - Provides fixtures for core package and API client
 
@@ -276,10 +276,10 @@ The repository has separate workflows for each component:
 - Runs regression tests
 - Uploads test results as artifacts
 
-### Backend API Tests (`.github/workflows/backend-test.yml`)
-- Runs on changes to `backend/**` or `core/**`
+### API Tests (`.github/workflows/backend-test.yml`)
+- Runs on changes to `api/**` or `core/**`
 - Installs core package first
-- Installs backend dependencies
+- Installs API dependencies
 - Runs API tests with pytest
 - Uploads test results as artifacts
 
@@ -292,7 +292,7 @@ The repository has separate workflows for each component:
 
 ### End-to-End Tests (`.github/workflows/e2e-test.yml`)
 - Runs on changes to any component
-- Installs all dependencies (core, backend, frontend)
+- Installs all dependencies (core, api, frontend)
 - Builds frontend
 - Runs full stack integration tests
 - Uploads test results as artifacts
@@ -415,12 +415,12 @@ The test suite validates these power components (all in Watts):
 ### Backend Tests
 
 **"ModuleNotFoundError: No module named 'fastapi'"**
-- Install backend dependencies: `cd backend && pip install -r requirements.txt`
+- Install API dependencies: `cd api && pip install -r requirements.txt`
 - Ensure core package is installed first: `cd core && pip install -e .`
 
 **"ImportError: cannot import name 'app' from 'main'"**
-- Check that `backend/src/main.py` exists and exports `app`
-- Verify Python path includes `backend/src`
+- Check that `api/main.py` exists and exports `app`
+- Verify Python path includes `api`
 
 ### Frontend Tests
 
@@ -443,8 +443,8 @@ The test suite validates these power components (all in Watts):
 - Check that `tests/e2e/conftest.py` correctly adds `core/src` to Python path
 
 **"FastAPI app not found"**
-- Ensure backend dependencies are installed
-- Check that `backend/src/main.py` exists and is importable
+- Ensure API dependencies are installed
+- Check that `api/main.py` exists and is importable
 
 ### Regression Tests
 
@@ -514,7 +514,7 @@ pytest tests/ -v
 python test_regression.py
 
 # 2. Backend tests
-cd ../backend
+cd ../api
 pip install -r requirements.txt && pip install pytest fastapi[all]
 pytest tests/ -v
 
