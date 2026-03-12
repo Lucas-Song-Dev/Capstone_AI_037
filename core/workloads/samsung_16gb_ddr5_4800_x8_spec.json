@@ -2,6 +2,7 @@
   "memspec": {
     "memoryId": "samsung_16gb_ddr5_4800_x8",
     "memoryType": "DDR5",
+    "registered": false,
     "notes": "Spec derived from Virtium VL47R2L63B datasheet (Samsung K4RAH086VB-BCQK chip) at 4800 MT/s",
     "memarchitecturespec": {
       "width": 16,
@@ -11,6 +12,7 @@
       "nbrOfColumns": 1024,
       "nbrOfRows": 65536,
       "nbrOfDevices": 2,
+      "nbrOfDBs": 8,
       "burstLength": 16,
       "dataRate": 2,
       "page_size_KB": 1

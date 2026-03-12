@@ -2,6 +2,7 @@
   "memspec": {
     "memoryId": "ddr5",
     "memoryType": "DDR5",
+    "registered": false,
     "memarchitecturespec": {
         "nbrOfChannels": 0,
         "nbrOfColumns": 1024,
@@ -14,6 +15,7 @@
         "nbrOfBanks": 16,
         "nbrOfRanks": 1,
         "nbrOfDevices": 8,
+        "nbrOfDBs": 8,
         "RefMode": 1
     },
     "mempowerspec": {

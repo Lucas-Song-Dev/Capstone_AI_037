@@ -3,6 +3,7 @@ from parser import load_memspec, load_workload
 
 from interface_model import DDR5InterfacePowerModel
 from core_model import DDR5CorePowerModel
+from component_model import DDR5ComponentPowerModel
 from ddr5 import DDR5
 
 class DIMM:
@@ -12,16 +13,19 @@ class DIMM:
         workload,
         dram_list,
         interface_model: Optional[DDR5InterfacePowerModel] = None,
+        component_model: Optional[DDR5ComponentPowerModel] = None
     ):
         self.memspec = memspec
         self.workload = workload
 
         self.corepower: Optional[Dict[str, float]] = None
         self.interfacepower: Optional[Dict[str, float]] = None
+        self.componentpower: Optional[Dict[str, float]] = None
         self.totalpower: Optional[Dict[str, float]] = None
 
         self.dram_list = dram_list
         self.interface_model = interface_model
+        self.component_model = component_model
 
     @classmethod
     def load_specs(cls, memspec_path: str, workload_path: str, core_model=None, interface_model=None, dram_cls=DDR5):
@@ -32,12 +36,15 @@ class DIMM:
             core_model = DDR5CorePowerModel()
         if interface_model is None:
             interface_model = DDR5InterfacePowerModel()
+        if component_model is None:
+            component_model = DDR5ComponentPowerModel()
 
         dimm = cls.from_memspec(
             memspec,
             workload,
             core_model=core_model,
             interface_model=interface_model,
+            component_model=component_model
             dram_cls=dram_cls,
         )
         return dimm
@@ -67,11 +74,13 @@ class DIMM:
         workload,
         core_model: Optional[DDR5CorePowerModel] = None,
         interface_model: Optional[DDR5InterfacePowerModel] = None,
+        component_model: Optional[DDR5ComponentPowerModel] = None,
         dram_cls=DDR5,
         num_subchannels: int = 2,
     ):
         core_model = core_model or DDR5CorePowerModel()
         interface_model = interface_model or DDR5InterfacePowerModel()
+        component_model = component_model or DDR5ComponentPowerModel()
 
         arch = memspec.memarchitecturespec
         devices_per_rank = cls._infer_devices_per_rank(
@@ -87,13 +96,15 @@ class DIMM:
         dram_list = [dram_cls(memspec, workload, core_model=core_model) for _ in range(total_devices)]
 
         # Note that interface power is computed once per DIMM, not per device, since it's a shared bus property.
-        return cls(memspec, workload, dram_list, interface_model=interface_model)
+        return cls(memspec, workload, dram_list, interface_model=interface_model, component_model=component_model)
     
     def compute_all(self) -> Dict[str, float]:
         if self.dram_list is None:
             raise ValueError("No DRAM devices")
         if self.interface_model is None:
             raise ValueError("interface_model is None")
+        if self.component_model is None:
+            raise ValueError("component_model is None")
 
         def add_dicts(d1, d2):
             keys = set(d1.keys()) | set(d2.keys())
@@ -106,15 +117,21 @@ class DIMM:
         # Interface power is a shared bus/topology property; compute once per DIMM.
         self.interfacepower = self.interface_model.compute(self.memspec, self.workload)
 
+        # Component power is computed once per DIMM
+        self.componentpower = self.component_model.compute(self.memspec, self.workload)
+
         core_total = float((self.corepower or {}).get("P_total_core", 0.0))
         if_total = float((self.interfacepower or {}).get("P_total_interface", 0.0))
+        cmp_total = float((self.componentpower or {}).get("P_total_component", 0.0))
 
         merged: Dict[str, float] = {}
         merged.update({f"core.{k}": v for k, v in (self.corepower or {}).items()})
         merged.update({f"if.{k}": v for k, v in (self.interfacepower or {}).items()})
+        merged.update({f"if.{k}": v for k, v in (self.componentpower or {}).items()})
         merged["P_total_core"] = core_total
         merged["P_total_interface"] = if_total
-        merged["P_total"] = core_total + if_total
+        merged["P_total_component"] = cmp_total
+        merged["P_total"] = core_total + if_total + cmp_total
 
         self.totalpower = merged
         return merged
@@ -123,7 +140,7 @@ class DIMM:
         self.dram_list[index].report_power()
     
     def report_dimm_power(self):
-        if self.corepower is None or self.interfacepower is None:
+        if self.corepower is None or self.interfacepower is None or self.componentpower is None:
             raise RuntimeError("Must call compute_all() before report_power()")
 
         print("\n" + "="*70)
@@ -139,6 +156,7 @@ class DIMM:
         print(f"Banks: {arch.nbrOfBanks}  |  Bank Groups: {arch.nbrOfBankGroups}")
         print(f"Rows: {arch.nbrOfRows}  |  Columns: {arch.nbrOfColumns}")
         print(f"Ranks: {arch.nbrOfRanks}  |  # of DRAM devices (modeled): {len(self.dram_list)}")
+        print(f"Data buffers: {arch.nbrOfDBs}")
         print()
 
         # ---- Core power ----
@@ -217,11 +235,22 @@ class DIMM:
             print(f"  {'-'*44}")
             print(f"  {'P_total_interface':30s}: {self.interfacepower['P_total_interface']:12.6f}")
         print()
+        
+        print("---- Component Power Breakdown (W) ----")
+        for k in [
+            "P_RCD",
+            "P_DB",
+            "P_total_cmp",
+        ]:
+            if k in self.componentpower:
+                print(f"{k:22s}: {self.componentpower[k]:.4f}")
+        print()
 
         # ---- Totals ----
         print("--- DIMM Total Power (W) ---")
         print(f"  {'P_total_core':30s}: {self.totalpower['P_total_core']:12.6f}")
         print(f"  {'P_total_interface':30s}: {self.totalpower['P_total_interface']:12.6f}")
+        print(f"  {'P_total_component':30s}: {self.totalpower['P_total_component']:12.6f}")
         print(f"  {'-'*44}")
         print(f"  {'P_TOTAL_DIMM':30s}: {self.totalpower['P_total']:12.6f}")
         print("="*70 + "\n")
