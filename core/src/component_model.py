@@ -31,9 +31,7 @@ class DDR5ComponentPowerModel:
         # --------------------------------------------------------------------
         # 1) Register Clock Driver Power
         # --------------------------------------------------------------------
-        if not memspec.registered:
-            P_RCD = 0
-        else:
+        if memspec.registered:
             P_RCD = (((1 - CKE_LO_ACT_frac) * p.idd3n) + 
                            ((p.idd4w - p.idd3n) * WR_frac) + 
                            (p.idd4r - p.idd3n) * RD_frac) * vdd
@@ -41,17 +39,23 @@ class DDR5ComponentPowerModel:
         # --------------------------------------------------------------------
         # 2) Data Buffer Power
         # --------------------------------------------------------------------
-        P_DB = a.nbrOfDBs * (((1 - CKE_LO_ACT_frac) * p.idd3n) + 
-                           ((p.idd4w - p.idd3n) * WR_frac) + 
-                           (p.idd4r - p.idd3n) * RD_frac) * vdd
+            P_DB = a.nbrOfDBs * (((1 - CKE_LO_ACT_frac) * p.idd3n) + 
+                            ((p.idd4w - p.idd3n) * WR_frac) + 
+                            (p.idd4r - p.idd3n) * RD_frac) * vdd
 
         # --------------------------------------------------------------------
         # 5) Aggregate
         # --------------------------------------------------------------------
-        P_total_cmp = P_RCD + P_DB
+            P_total_cmp = P_RCD + P_DB
 
-        return {
-            "P_RCD": P_RCD,
-            "P_DB": P_DB,
-            "P_total_component": P_total_cmp,
-        }
+            return {
+                "P_RCD": P_RCD,
+                "P_DB": P_DB,
+                "P_total_component": P_total_cmp,
+            }
+        else:
+            return {
+                "P_RCD": 0.0,
+                "P_DB": 0.0,
+                "P_total_component": 0.0,
+            }
