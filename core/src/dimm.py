@@ -28,7 +28,7 @@ class DIMM:
         self.component_model = component_model
 
     @classmethod
-    def load_specs(cls, memspec_path: str, workload_path: str, core_model=None, interface_model=None, dram_cls=DDR5):
+    def load_specs(cls, memspec_path: str, workload_path: str, core_model=None, interface_model=None, component_model=None, dram_cls=DDR5):
         memspec = load_memspec(memspec_path)
         workload = load_workload(workload_path)
 
@@ -44,7 +44,7 @@ class DIMM:
             workload,
             core_model=core_model,
             interface_model=interface_model,
-            component_model=component_model
+            component_model=component_model,
             dram_cls=dram_cls,
         )
         return dimm
