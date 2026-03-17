@@ -40,6 +40,7 @@ class TestAPIIntegration:
             "memspec": {
                 "memoryId": "test",
                 "memoryType": "DDR5",
+                "registered": "false",
                 "memarchitecturespec": {
                     "width": 8,
                     "nbrOfBanks": 16,
