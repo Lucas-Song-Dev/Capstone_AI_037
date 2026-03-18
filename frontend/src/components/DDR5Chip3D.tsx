@@ -46,16 +46,22 @@ function PowerIndicator({
   );
 }
 
-function MemoryDie({ 
+export function MemoryDie({ 
   position,
   bankGroups = 8,
   banks = 16,
-  color = '#3b82f6'
+  /** When set (e.g. visual builder), each slot shows that bank group’s real count instead of spreading `banks` evenly (which wrongly put the 5th bank on “rank 2” when 8 groups exist). */
+  banksPerGroupExact,
+  color = '#3b82f6',
+  showIoPads = true
 }: { 
   position: [number, number, number];
   bankGroups?: number;
   banks?: number;
+  banksPerGroupExact?: number[];
   color?: string;
+  /** When false, I/O pads are hidden (e.g. in builder to avoid confusion with rank count). */
+  showIoPads?: boolean;
 }) {
   const meshRef = useRef<THREE.Group>(null);
   
@@ -65,9 +71,16 @@ function MemoryDie({
     }
   });
 
-  const banksPerGroup = Math.ceil(banks / bankGroups);
+  /** Preset DIMM: distribute total banks evenly. Builder: use banksPerGroupExact per slot. */
+  const banksPerGroupBase = bankGroups > 0 ? Math.floor(banks / bankGroups) : 0;
+  const remainder = bankGroups > 0 ? banks - bankGroups * banksPerGroupBase : 0;
+  const useExact = Array.isArray(banksPerGroupExact) && banksPerGroupExact.length > 0;
+  /** Max 4 bank groups per row → 2 rows when 8 BGs (2 ranks × 4). */
   const bankRows = Math.ceil(bankGroups / 4);
   const bankCols = Math.min(bankGroups, 4);
+  /** Bank tiles: 2 rows, max 4 per row (user-requested layout). */
+  const BANK_TILE_ROWS = 2;
+  const BANK_TILE_COLS_MAX = 4;
 
   return (
     <group ref={meshRef} position={position}>
@@ -83,15 +96,16 @@ function MemoryDie({
         const col = groupIdx % bankCols;
         const groupX = (col - (bankCols - 1) / 2) * 0.55;
         const groupZ = (row - (bankRows - 1) / 2) * 0.7;
+        const banksInThisGroup = useExact
+          ? (banksPerGroupExact![groupIdx] ?? 0)
+          : groupIdx < remainder
+            ? banksPerGroupBase + 1
+            : banksPerGroupBase;
         
-        // Calculate banks within this group
-        const banksInThisGroup = groupIdx < bankGroups - 1 
-          ? banksPerGroup 
-          : banks - (bankGroups - 1) * banksPerGroup;
-        
-        // Layout banks within the group (2x2 or 2x1 depending on count)
-        const bankSubRows = Math.ceil(Math.sqrt(banksInThisGroup));
-        const bankSubCols = Math.ceil(banksInThisGroup / bankSubRows);
+        // Layout banks in 2 rows, max 4 per row
+        const bankSubRows = BANK_TILE_ROWS;
+        const bankSubCols = Math.min(BANK_TILE_COLS_MAX, Math.max(1, Math.ceil(banksInThisGroup / bankSubRows)));
+        const visibleBanks = Math.min(banksInThisGroup, bankSubRows * bankSubCols);
         
         return (
           <group key={`group-${groupIdx}`} position={[groupX, 0.1, groupZ]}>
@@ -109,8 +123,8 @@ function MemoryDie({
               />
             </mesh>
             
-            {/* Individual banks within the group */}
-            {Array.from({ length: banksInThisGroup }).map((_, bankIdx) => {
+            {/* Individual banks: 2 rows × up to 4 cols */}
+            {Array.from({ length: visibleBanks }).map((_, bankIdx) => {
               const bankRow = Math.floor(bankIdx / bankSubCols);
               const bankCol = bankIdx % bankSubCols;
               const bankX = (bankCol - (bankSubCols - 1) / 2) * 0.12;
@@ -136,8 +150,8 @@ function MemoryDie({
         );
       })}
       
-      {/* I/O pads */}
-      {[-1.1, 1.1].map((x, i) => (
+      {/* I/O pads (optional; hidden in builder so they are not mistaken for ranks) */}
+      {showIoPads && [-1.1, 1.1].map((x, i) => (
         <mesh key={`io-${i}`} position={[x, 0.08, 0]}>
           <boxGeometry args={[0.2, 0.04, 1.5]} />
           <meshStandardMaterial color="#fbbf24" metalness={0.8} roughness={0.2} />

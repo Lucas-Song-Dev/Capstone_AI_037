@@ -35,6 +35,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# TypeScript
+**/tsconfig.tsbuildinfo
+
 # Next.js
 frontend/.next/
 frontend/out/
