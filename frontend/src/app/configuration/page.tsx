@@ -4,12 +4,14 @@ import { useState, useCallback, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { ConfigPanel } from '@/components/ConfigPanel';
 import { PresetSelector } from '@/components/PresetSelector';
+import { VisualBuilderContent } from '@/components/VisualBuilderContent';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Upload, FileJson, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Upload, FileJson, CheckCircle2, AlertCircle, MemoryStick, Box } from 'lucide-react';
 import { useConfig } from '@/contexts/ConfigContext';
 import { memoryPresets, workloadPresets } from '@/lib/presets';
 import { useRouter } from 'next/navigation';
@@ -17,6 +19,7 @@ import { useRouter } from 'next/navigation';
 export default function Configuration() {
   const { memspec, workload, setMemspec, setWorkload, loadWorkloadFromFile, loadMemspecFromFile } = useConfig();
   const router = useRouter();
+  const [memorySource, setMemorySource] = useState<'preset' | 'build'>('preset');
   const [selectedMemoryId, setSelectedMemoryId] = useState(memoryPresets[0].id);
   const [selectedWorkloadId, setSelectedWorkloadId] = useState('balanced');
 
@@ -134,12 +137,24 @@ export default function Configuration() {
           <div className="mb-6">
             <h1 className="text-3xl font-bold mb-2">Configuration</h1>
             <p className="text-muted-foreground">
-              Configure memory specifications and workload parameters. Upload custom JSON files or select from presets.
+              Configure memory specifications and workload parameters. Select a preset, build your own DIMM, or upload custom JSON files.
             </p>
           </div>
 
+          <Tabs value={memorySource} onValueChange={(v) => setMemorySource(v as 'preset' | 'build')} className="w-full">
+            <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+              <TabsTrigger value="preset" className="flex items-center gap-2">
+                <MemoryStick className="w-4 h-4" />
+                Preset
+              </TabsTrigger>
+              <TabsTrigger value="build" className="flex items-center gap-2">
+                <Box className="w-4 h-4" />
+                Build your own
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="preset" className="mt-0">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Column - Presets */}
             <div className="space-y-6">
               <PresetSelector
                 selectedMemoryId={selectedMemoryId}
@@ -311,6 +326,18 @@ export default function Configuration() {
               </div>
             </div>
           </div>
+            </TabsContent>
+
+            <TabsContent value="build" className="mt-0">
+              <VisualBuilderContent
+                onApply={(m) => {
+                  setMemspec(m);
+                  setSelectedMemoryId('custom');
+                  setMemorySource('preset');
+                }}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
     </div>

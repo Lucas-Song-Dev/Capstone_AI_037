@@ -11,9 +11,9 @@ JEDEC-compliant DDR5 power modeling and calculation tool with Next.js frontend a
 │   ├── tests/              # Unit tests
 │   ├── verif/              # Verification tests
 │   └── workloads/          # Test data
-├── api/                     # FastAPI API
+├── api/                     # FastAPI API + Vercel serverless entry
 │   ├── main.py             # API application
-│   ├── index.py            # Vercel serverless entry
+│   ├── index.py            # Vercel serverless handler (Mangum)
 │   └── tests/              # API tests
 ├── frontend/                # Next.js frontend
 │   ├── src/                # Frontend source
@@ -79,7 +79,7 @@ Work in `api/`. The API imports the core package.
 
 ### Frontend Development
 
-Work in `frontend/src/`. The frontend calls API endpoints when `NEXT_PUBLIC_API_URL` is set.
+Work in `frontend/src/`. The frontend runs power calculations client-side by default; the API is available for optional or programmatic use (e.g. when `NEXT_PUBLIC_USE_API` or API URL is set).
 
 ## GitHub Actions
 

@@ -31,10 +31,12 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# CORS middleware for Next.js frontend
+# CORS: use CORS_ORIGINS env (e.g. https://your-app.vercel.app) in production; "*" for dev
+_cors_origins = os.environ.get("CORS_ORIGINS", "*")
+_cors_origins_list = [o.strip() for o in _cors_origins.split(",")] if _cors_origins != "*" else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your Vercel domain
+    allow_origins=_cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
