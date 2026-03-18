@@ -30,20 +30,31 @@ export const MAX_RANKS = 2;
 export const MAX_BANK_GROUPS = 4;
 export const MAX_BANKS_PER_GROUP = 32;
 
+/**
+ * UUID when available (browser / modern Node); fallback for Vitest/jsdom and older Node on CI.
+ */
+function newEntityId(prefix: string): string {
+  const c = globalThis.crypto as Crypto | undefined;
+  if (c && typeof c.randomUUID === 'function') {
+    return `${prefix}-${c.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
 export function createBankSlot(): BankSlot {
-  return { id: `bank-${crypto.randomUUID()}`, type: 'bank' };
+  return { id: newEntityId('bank'), type: 'bank' };
 }
 
 export function createBankGroup(banks: BankSlot[] = [], holderCapacity?: 16 | 32): BankGroup {
   return {
-    id: `bg-${crypto.randomUUID()}`,
+    id: newEntityId('bg'),
     banks,
     holderCapacity,
   };
 }
 
 export function createRank(bankGroups: BankGroup[] = []): Rank {
-  return { id: `rank-${crypto.randomUUID()}`, bankGroups };
+  return { id: newEntityId('rank'), bankGroups };
 }
 
 /** Initial state: blank board (no ranks, no banks) */
