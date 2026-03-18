@@ -5,6 +5,7 @@ import type { MemSpec, Workload } from './types';
 const mockMemspec: MemSpec = {
   memoryId: 'test_ddr5',
   memoryType: 'DDR5',
+  registered: false,
   memarchitecturespec: {
     width: 8,
     nbrOfBanks: 16,
