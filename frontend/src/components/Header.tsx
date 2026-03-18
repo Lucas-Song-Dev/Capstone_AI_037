@@ -14,13 +14,36 @@ import { cn } from '@/lib/utils';
 export function Header() {
   const pathname = usePathname();
 
-  const navItems = [
+  const designConfigGroup = [
     { path: '/target-power', label: 'Inverse Design', icon: Target },
     { path: '/server-deployment', label: 'Deployment Planning', icon: Server },
     { path: '/configuration', label: 'Configuration', icon: Settings },
+  ];
+  const powerGroup = [
     { path: '/core-power', label: 'Core Power', icon: Zap },
     { path: '/dimm-power', label: 'DIMM Power', icon: DIMMIcon },
   ];
+
+  const NavButton = ({ item }: { item: { path: string; label: string; icon: typeof Settings } }) => {
+    const Icon = item.icon;
+    const isActive = pathname === item.path;
+    return (
+      <Button
+        variant={isActive ? 'secondary' : 'ghost'}
+        size="sm"
+        asChild
+        className={cn(
+          'h-8 px-3 text-xs',
+          isActive && 'bg-primary/10 text-primary'
+        )}
+      >
+        <Link href={item.path}>
+          <Icon className="w-3.5 h-3.5 mr-1.5" />
+          {item.label}
+        </Link>
+      </Button>
+    );
+  };
 
   return (
     <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
@@ -42,29 +65,19 @@ export function Header() {
           </Link>
 
           <div className="flex items-center gap-2">
-            {/* Navigation */}
+            {/* Navigation: Design & config | Power (Visual Builder is inside Configuration tab) */}
             <nav className="hidden md:flex items-center gap-1 mr-4">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.path;
-                return (
-                  <Button
-                    key={item.path}
-                    variant={isActive ? 'secondary' : 'ghost'}
-                    size="sm"
-                    asChild
-                    className={cn(
-                      'h-8 px-3 text-xs',
-                      isActive && 'bg-primary/10 text-primary'
-                    )}
-                  >
-                    <Link href={item.path}>
-                      <Icon className="w-3.5 h-3.5 mr-1.5" />
-                      {item.label}
-                    </Link>
-                  </Button>
-                );
-              })}
+              <div className="flex items-center gap-1">
+                {designConfigGroup.map((item) => (
+                  <NavButton key={item.path} item={item} />
+                ))}
+              </div>
+              <div className="h-5 w-px bg-border mx-2" aria-hidden />
+              <div className="flex items-center gap-1">
+                {powerGroup.map((item) => (
+                  <NavButton key={item.path} item={item} />
+                ))}
+              </div>
             </nav>
 
             <Tooltip>

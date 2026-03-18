@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { computeCorePower, computeDIMMPower, formatPower, calculateChipsPerDIMM } from './ddr5Calculator';
+import {
+  computeCorePower,
+  computeDIMMPower,
+  formatPower,
+  calculateChipsPerDIMM,
+  calculateCapacity,
+  calculateDataRate,
+} from './ddr5Calculator';
 import type { MemSpec, Workload } from './types';
 
 const mockMemspec: MemSpec = {
@@ -185,6 +192,67 @@ describe('ddr5Calculator', () => {
     it('should format milliwatts correctly', () => {
       expect(formatPower(0.001)).toBe('1.000 mW'); // precision-1 = 3 decimal places
       expect(formatPower(0.699)).toBe('699.000 mW');
+    });
+
+    it('should format exactly 1 W as watts', () => {
+      expect(formatPower(1)).toBe('1.0000 W');
+      expect(formatPower(1.0)).toBe('1.0000 W');
+    });
+
+    it('should format zero as mW', () => {
+      expect(formatPower(0)).toBe('0.000 mW');
+    });
+
+    it('should respect custom precision', () => {
+      expect(formatPower(2.5, 2)).toBe('2.50 W');
+      expect(formatPower(0.123, 2)).toBe('123.0 mW');
+    });
+  });
+
+  describe('computeCorePower edge cases', () => {
+    it('should handle zero workload percentages', () => {
+      const zeroWorkload: Workload = {
+        ...mockWorkload,
+        RDsch_percent: 0,
+        WRsch_percent: 0,
+        BNK_PRE_percent: 100,
+      };
+      const result = computeCorePower(mockMemspec, zeroWorkload);
+      expect(result.P_total_core).toBeGreaterThanOrEqual(0);
+      expect(result.P_RD_core).toBe(0);
+      expect(result.P_WR_core).toBe(0);
+    });
+
+    it('should return all required power keys', () => {
+      const result = computeCorePower(mockMemspec, mockWorkload);
+      const keys = [
+        'P_total_core',
+        'P_VDD_core',
+        'P_VPP_core',
+        'P_PRE_STBY_core',
+        'P_ACT_STBY_core',
+        'P_RD_core',
+        'P_WR_core',
+        'P_REF_core',
+        'P_ACT_PRE_core',
+      ];
+      keys.forEach((k) => expect(result).toHaveProperty(k));
+    });
+  });
+
+  describe('calculateCapacity and calculateDataRate', () => {
+    it('calculateCapacity returns positive GB for valid arch', () => {
+      const arch = mockMemspec.memarchitecturespec;
+      const cap = calculateCapacity(arch);
+      expect(cap).toBeGreaterThan(0);
+      expect(Number.isFinite(cap)).toBe(true);
+    });
+
+    it('calculateDataRate returns positive MT/s for valid timing', () => {
+      const timing = mockMemspec.memtimingspec;
+      const rate = calculateDataRate(timing);
+      expect(rate).toBeGreaterThan(0);
+      expect(Number.isInteger(rate)).toBe(true);
     });
   });
 });

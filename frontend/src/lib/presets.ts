@@ -388,6 +388,16 @@ export const memoryPresets: MemoryPreset[] = [
   },
 ];
 
+/** Speed options for component-based builder (MT/s) */
+export const SPEED_OPTIONS = [4800, 5600, 6400] as const;
+
+/** Return a base MemSpec for the given speed (first matching preset). Used to derive config from DDR5 components. */
+export function getBaseMemspecBySpeed(speedMtS: number): MemSpec {
+  const speedStr = `${speedMtS} MT/s`;
+  const preset = memoryPresets.find((p) => p.speed === speedStr);
+  return (preset ?? memoryPresets[0]).memspec;
+}
+
 export const defaultWorkload: Workload = {
   BNK_PRE_percent: 50.0,
   CKE_LO_PRE_percent: 0.0,
