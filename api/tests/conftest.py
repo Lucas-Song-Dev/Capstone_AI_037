@@ -41,6 +41,7 @@ def sample_memspec():
             "nbrOfColumns": 1024,
             "nbrOfRows": 65536,
             "nbrOfDevices": 1,
+            "nbrOfDBs": 0,
             "burstLength": 16,
             "dataRate": 2
         },

@@ -50,6 +50,7 @@ class MemArchitectureSpecModel(BaseModel):
     nbrOfColumns: int
     nbrOfRows: int
     nbrOfDevices: int
+    nbrOfDBs: int
     burstLength: int
     dataRate: int
 
@@ -130,6 +131,7 @@ def memspec_model_to_obj(memspec_model: MemSpecModel) -> MemSpec:
         nbrOfColumns=memspec_model.memarchitecturespec.nbrOfColumns,
         nbrOfRows=memspec_model.memarchitecturespec.nbrOfRows,
         nbrOfDevices=memspec_model.memarchitecturespec.nbrOfDevices,
+        nbrOfDBs=memspec_model.memarchitecturespec.nbrOfDBs,
         burstLength=memspec_model.memarchitecturespec.burstLength,
         dataRate=memspec_model.memarchitecturespec.dataRate,
     )
