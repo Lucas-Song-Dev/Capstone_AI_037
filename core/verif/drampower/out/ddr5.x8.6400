@@ -1,0 +1,54 @@
+Detected DDR5 memory type
+
+======================================================================
+DIMM POWER REPORT
+======================================================================
+Memory: ddr5
+Type: DDR5
+Device width: x8
+Banks: 32  |  Bank Groups: 8
+Rows: 65536  |  Columns: 1024
+Ranks: 1  |  # of DRAM devices (modeled): 8
+
+--- Core Power Breakdown (W) ---
+  P_PRE_STBY_core               :     0.015552
+  P_ACT_STBY_core               :     0.360998
+  P_ACT_PRE_core                :     0.119278
+  P_RD_core                     :     0.169920
+  P_WR_core                     :     0.064176
+  P_REF_core                    :     0.002691
+  P_VDD_core                    :     0.732616
+  P_VPP_core                    :     0.000000
+  --------------------------------------------
+  P_total_core                  :     0.732616
+
+--- Interface / I/O Power Breakdown (W) ---
+  [Termination Power]
+    P_DQ_WRITE                  :     0.019348
+    P_DQ_READ                   :     0.036061
+    P_CA                        :     0.020856
+    P_CK                        :     0.017677
+    P_WCK                       :     0.004950
+    P_DQS                       :     0.013852
+    P_CS                        :     0.000745
+    P_total_interface_term      :     0.113490
+
+  [Dynamic Power (CV²f)]
+    P_dyn_dq_W                  :     0.054605
+    P_dyn_ca_W                  :     0.010859
+    P_dyn_cs_W                  :     0.000388
+    P_dyn_ck_W                  :     0.124103
+    P_dyn_dqs_W                 :     0.054605
+    P_dyn_wck_W                 :     0.034749
+    P_total_interface_dyn       :     0.279308
+
+  --------------------------------------------
+  P_total_interface             :     0.392798
+
+--- DIMM Total Power (W) ---
+  P_total_core                  :     0.732616
+  P_total_interface             :     0.392798
+  --------------------------------------------
+  P_TOTAL_DIMM                  :     1.125414
+======================================================================
+

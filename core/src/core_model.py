@@ -35,12 +35,12 @@ class DDR5CorePowerModel:
         # 1) Background (standby) power (VDD)
         # --------------------------------------------------------------------
         I_PRE_bg = (1.0 - CKE_LO_PRE_frac) * p.idd2n + CKE_LO_PRE_frac * p.idd2p
-        P_PRE_STBY_core = vdd * I_PRE_bg
+        P_PRE_STBY_core = vdd * I_PRE_bg * BNK_PRE_frac
 
         I_ACT_bg = (1.0 - CKE_LO_ACT_frac) * p.idd3n + CKE_LO_ACT_frac * p.idd3p
-        P_ACT_STBY_core = vdd * I_ACT_bg
+        P_ACT_STBY_core = vdd * I_ACT_bg * (1.0 - BNK_PRE_frac)
 
-        P_background_vdd = BNK_PRE_frac * P_PRE_STBY_core + (1.0 - BNK_PRE_frac) * P_ACT_STBY_core
+        P_background_vdd =  P_PRE_STBY_core + P_ACT_STBY_core
 
         # --------------------------------------------------------------------
         # 2) Refresh power (VDD + VPP)

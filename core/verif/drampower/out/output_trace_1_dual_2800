@@ -1,0 +1,33 @@
+=== Time base ===
+cycles              : 2919445
+tCK (s)             : 7.690000000000e-10
+total time T (s)    : 2.245053205000e-03
+
+=== Total / Core / Interface (Average Power) ===
+Total power (W)     : 1.114239546423
+Core power (W)      : 0.960657505673
+Interface power (W) : 0.153582040750
+
+=== Interface breakdown (Average Power, W) ===
+controller.dynamic  : 0.057607465900
+controller.static   : 0.074321997760
+dram.dynamic        : 0.009835095342
+dram.static         : 0.011817481747
+
+=== Core breakdown (Bank-summed components, Average Power, W) ===
+ACT       : 0.091569743864
+PRE       : 0.072097045843
+RD        : 0.442540275155
+BG_ACT    : 0.003515473241
+BG_PRE    : 0.025484891820
+REF_AB    : 0.001503614557
+
+=== Core shared components (Average Power, W) ===
+E_bg_act_shared: 0.323946461194
+
+=== Sanity checks ===
+E_total (J)         : 2.501527064835e-03
+E_iface (J)         : 3.447998528162e-04
+E_core (J)          : 2.156727212019e-03
+E_core_recon (J)    : 2.156727212019e-03
+core recon error (J): 0.000000000000e+00

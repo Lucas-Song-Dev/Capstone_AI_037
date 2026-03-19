@@ -69,23 +69,27 @@ def sum_core_shared_energies_j(d: Dict[str, Any]) -> Dict[str, float]:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--json", required=True)
+    ap.add_argument("--json", required=True, nargs="+", help="One or more DRAMPower output JSON files to sum")
     ap.add_argument("--cycles", type=int, required=True)
     ap.add_argument("--tck", type=float, default=None)
     ap.add_argument("--memspec_json", default=None)
     args = ap.parse_args()
 
-    with open(args.json, "r") as f:
-        out = json.load(f)
+    outs = []
+    for path in args.json:
+        with open(path, "r") as f:
+            outs.append(json.load(f))
+    if not outs:
+        raise RuntimeError("No JSON inputs provided")
 
     # Determine tCK
     tCK = args.tck
     if tCK is None:
         # DRAMPower CLI output JSON typically does not include the memspec.
         # Keep a couple of fallbacks in case a different wrapper embeds it.
-        tCK = safe_get(out, "memtimingspec", "tCK", default=None)
+        tCK = safe_get(outs[0], "memtimingspec", "tCK", default=None)
         if tCK is None:
-            tCK = safe_get(out, "memspec", "memtimingspec", "tCK", default=None)
+            tCK = safe_get(outs[0], "memspec", "memtimingspec", "tCK", default=None)
         if tCK is None and args.memspec_json:
             with open(args.memspec_json, "r") as mf:
                 mem = json.load(mf)
@@ -102,13 +106,23 @@ def main():
     if T <= 0:
         raise ValueError("Computed time T <= 0")
 
-    # Energies
-    E_total = float(out.get("TotalEnergy", 0.0))
-    E_iface = sum_interface_energy_j(out)
-    E_core = E_total - E_iface
+    # Energies (sum across all provided JSONs, e.g. multiple subchannels)
+    E_total = 0.0
+    E_iface = 0.0
+    bank_E = {k: 0.0 for k in CORE_BANK_FIELDS}
+    shared_E = {k: 0.0 for k in CORE_SHARED_FIELDS}
 
-    bank_E = sum_core_bank_energies_j(out)
-    shared_E = sum_core_shared_energies_j(out)
+    for out in outs:
+        E_total += float(out.get("TotalEnergy", 0.0))
+        E_iface += sum_interface_energy_j(out)
+        b = sum_core_bank_energies_j(out)
+        s = sum_core_shared_energies_j(out)
+        for k in CORE_BANK_FIELDS:
+            bank_E[k] += b.get(k, 0.0)
+        for k in CORE_SHARED_FIELDS:
+            shared_E[k] += s.get(k, 0.0)
+
+    E_core = E_total - E_iface
 
     # Powers
     P_total = E_total / T
@@ -127,15 +141,25 @@ def main():
     print(f"Interface power (W) : {P_iface:.12f}")
     print()
 
-    iface = out.get("InterfaceEnergy", {})
-    ctrl = iface.get("controller", {})
-    dram = iface.get("dram", {})
+    # Interface breakdown (sum across all JSONs)
+    ctrl_dyn = 0.0
+    ctrl_sta = 0.0
+    dram_dyn = 0.0
+    dram_sta = 0.0
+    for out in outs:
+        iface = out.get("InterfaceEnergy", {})
+        ctrl = iface.get("controller", {})
+        dram = iface.get("dram", {})
+        ctrl_dyn += float(ctrl.get("dynamicEnergy", 0.0))
+        ctrl_sta += float(ctrl.get("staticEnergy", 0.0))
+        dram_dyn += float(dram.get("dynamicEnergy", 0.0))
+        dram_sta += float(dram.get("staticEnergy", 0.0))
 
     print("=== Interface breakdown (Average Power, W) ===")
-    print(f"controller.dynamic  : {float(ctrl.get('dynamicEnergy',0.0))/T:.12f}")
-    print(f"controller.static   : {float(ctrl.get('staticEnergy',0.0))/T:.12f}")
-    print(f"dram.dynamic        : {float(dram.get('dynamicEnergy',0.0))/T:.12f}")
-    print(f"dram.static         : {float(dram.get('staticEnergy',0.0))/T:.12f}")
+    print(f"controller.dynamic  : {ctrl_dyn/T:.12f}")
+    print(f"controller.static   : {ctrl_sta/T:.12f}")
+    print(f"dram.dynamic        : {dram_dyn/T:.12f}")
+    print(f"dram.static         : {dram_sta/T:.12f}")
     print()
 
     print("=== Core breakdown (Bank-summed components, Average Power, W) ===")
