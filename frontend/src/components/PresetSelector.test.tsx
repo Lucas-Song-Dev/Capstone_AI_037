@@ -12,6 +12,7 @@ describe('PresetSelector', () => {
       <PresetSelector
         selectedMemoryId={memoryPresets[0].id}
         selectedWorkloadId="balanced"
+        currentMemspec={memoryPresets[0].memspec}
         onSelectMemory={mockOnSelectMemory}
         onSelectWorkload={mockOnSelectWorkload}
       />
@@ -32,6 +33,7 @@ describe('PresetSelector', () => {
       <PresetSelector
         selectedMemoryId={memoryPresets[0].id}
         selectedWorkloadId="balanced"
+        currentMemspec={memoryPresets[0].memspec}
         onSelectMemory={mockOnSelectMemory}
         onSelectWorkload={mockOnSelectWorkload}
       />
@@ -49,6 +51,7 @@ describe('PresetSelector', () => {
       <PresetSelector
         selectedMemoryId={selectedId}
         selectedWorkloadId="balanced"
+        currentMemspec={memoryPresets[1].memspec}
         onSelectMemory={mockOnSelectMemory}
         onSelectWorkload={mockOnSelectWorkload}
       />
@@ -63,6 +66,7 @@ describe('PresetSelector', () => {
       <PresetSelector
         selectedMemoryId={memoryPresets[0].id}
         selectedWorkloadId="read_heavy"
+        currentMemspec={memoryPresets[0].memspec}
         onSelectMemory={mockOnSelectMemory}
         onSelectWorkload={mockOnSelectWorkload}
       />

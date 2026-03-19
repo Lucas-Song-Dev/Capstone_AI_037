@@ -13,6 +13,8 @@ import { calculateDataRate } from '@/lib/ddr5Calculator';
 interface PresetSelectorProps {
   selectedMemoryId: string;
   selectedWorkloadId: string;
+  /** Active MemSpec (preset or custom) — shown when Custom is selected. */
+  currentMemspec: MemSpec;
   onSelectMemory: (preset: MemSpec, id: string) => void;
   onSelectWorkload: (preset: Workload, id: string) => void;
   defaultManufacturer?: string;
@@ -21,6 +23,7 @@ interface PresetSelectorProps {
 export function PresetSelector({
   selectedMemoryId,
   selectedWorkloadId,
+  currentMemspec,
   onSelectMemory,
   onSelectWorkload,
   defaultManufacturer,
@@ -45,12 +48,11 @@ export function PresetSelector({
       isInitialMount.current = false;
       lastSelectedMemoryId.current = selectedMemoryId;
     } else if (lastSelectedMemoryId.current !== selectedMemoryId) {
-      // Preset changed (user selected a different preset): update tab to that preset's manufacturer
       const preset = memoryPresets.find((p) => p.id === selectedMemoryId);
       if (preset) {
         setActiveTab(preset.manufacturer);
-        lastSelectedMemoryId.current = selectedMemoryId;
       }
+      lastSelectedMemoryId.current = selectedMemoryId;
     }
   }, [selectedMemoryId, defaultManufacturer, manufacturers]);
 
@@ -63,6 +65,31 @@ export function PresetSelector({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Custom (builder / JSON) — active MemSpec drives Configuration panel */}
+        <div
+          className={`rounded-lg border p-3 mb-1 ${
+            selectedMemoryId === 'custom'
+              ? 'border-primary bg-primary/10 ring-1 ring-primary/30'
+              : 'border-dashed border-border bg-muted/20'
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-sm font-medium">Custom configuration</span>
+            {selectedMemoryId === 'custom' && (
+              <Badge className="text-[10px] px-1.5 py-0">Active</Badge>
+            )}
+          </div>
+          {selectedMemoryId === 'custom' ? (
+            <p className="text-xs font-mono text-muted-foreground break-all" title={currentMemspec.memoryId}>
+              {currentMemspec.memoryId}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Use <strong>Build your own</strong> → Use this config, or upload a memory JSON, to set a custom MemSpec.
+            </p>
+          )}
+        </div>
+
         {/* Memory Presets */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="w-full grid grid-cols-3 h-8 bg-secondary">

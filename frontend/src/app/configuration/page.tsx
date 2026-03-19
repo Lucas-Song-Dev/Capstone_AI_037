@@ -159,6 +159,7 @@ export default function Configuration() {
               <PresetSelector
                 selectedMemoryId={selectedMemoryId}
                 selectedWorkloadId={selectedWorkloadId}
+                currentMemspec={memspec}
                 onSelectMemory={handleSelectMemory}
                 onSelectWorkload={handleSelectWorkload}
                 defaultManufacturer={selectedManufacturer}
