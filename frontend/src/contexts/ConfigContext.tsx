@@ -1,12 +1,56 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  ReactNode,
+  type SetStateAction,
+} from 'react';
 import type { MemSpec, Workload } from '@/lib/types';
 import { memoryPresets, defaultWorkload } from '@/lib/presets';
+import { getInitialBoardState, type BoardState } from '@/lib/builderState';
+
+/** Persisted state for Build your own (board + DIMM sliders). */
+export type VisualBuilderDraft = {
+  boardState: BoardState;
+  width: 8 | 16;
+  nbrOfColumns: number;
+  nbrOfDevices: number;
+  speed: number;
+};
+
+function defaultVisualBuilderDraft(): VisualBuilderDraft {
+  return {
+    boardState: getInitialBoardState(),
+    width: 8,
+    nbrOfColumns: 1024,
+    nbrOfDevices: 8,
+    speed: 5600,
+  };
+}
+
+function parseVisualBuilderDraft(raw: unknown): VisualBuilderDraft | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const bs = o.boardState as BoardState | undefined;
+  if (!bs || typeof bs !== 'object' || !Array.isArray(bs.ranks)) return null;
+  return {
+    boardState: bs,
+    width: o.width === 16 ? 16 : 8,
+    nbrOfColumns: typeof o.nbrOfColumns === 'number' ? o.nbrOfColumns : 1024,
+    nbrOfDevices: typeof o.nbrOfDevices === 'number' ? o.nbrOfDevices : 8,
+    speed: typeof o.speed === 'number' ? o.speed : 5600,
+  };
+}
 
 interface ConfigContextType {
   memspec: MemSpec;
   workload: Workload;
   setMemspec: (memspec: MemSpec) => void;
   setWorkload: (workload: Workload) => void;
+  visualBuilderDraft: VisualBuilderDraft;
+  setVisualBuilderDraft: (u: SetStateAction<VisualBuilderDraft>) => void;
   loadWorkloadFromFile: (file: File) => Promise<void>;
   loadMemspecFromFile: (file: File) => Promise<void>;
 }
@@ -16,6 +60,7 @@ const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 const STORAGE_KEYS = {
   MEMSPEC: 'ddr5_calculator_memspec',
   WORKLOAD: 'ddr5_calculator_workload',
+  BUILDER_DRAFT: 'ddr5_calculator_visual_builder_draft',
 };
 
 function loadFromStorage<T>(key: string, defaultValue: T | null): T | null {
@@ -42,20 +87,28 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   // Initialize with defaults - we'll load from localStorage in useEffect
   const [memspec, setMemspecState] = useState<MemSpec>(memoryPresets[0].memspec);
   const [workload, setWorkloadState] = useState<Workload>(defaultWorkload);
+  const [visualBuilderDraft, setVisualBuilderDraftState] = useState<VisualBuilderDraft>(
+    defaultVisualBuilderDraft
+  );
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Load from localStorage on mount - this ensures we always get the latest saved values
+  // Load from localStorage on mount - memspec, workload, and visual builder draft together
   useEffect(() => {
     const storedMemspec = loadFromStorage<MemSpec>(STORAGE_KEYS.MEMSPEC, null);
     const storedWorkload = loadFromStorage<Workload>(STORAGE_KEYS.WORKLOAD, null);
-    
+    const storedDraft = loadFromStorage<unknown>(STORAGE_KEYS.BUILDER_DRAFT, null);
+    const draft = storedDraft != null ? parseVisualBuilderDraft(storedDraft) : null;
+
     if (storedMemspec) {
       setMemspecState(storedMemspec);
     }
     if (storedWorkload) {
       setWorkloadState(storedWorkload);
     }
-    
+    if (draft) {
+      setVisualBuilderDraftState(draft);
+    }
+
     setIsInitialized(true);
   }, []); // Only run on mount
 
@@ -72,12 +125,22 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     }
   }, [workload, isInitialized]);
 
+  useEffect(() => {
+    if (isInitialized) {
+      saveToStorage(STORAGE_KEYS.BUILDER_DRAFT, visualBuilderDraft);
+    }
+  }, [visualBuilderDraft, isInitialized]);
+
   const setMemspec = useCallback((newMemspec: MemSpec) => {
     setMemspecState(newMemspec);
   }, []);
 
   const setWorkload = useCallback((newWorkload: Workload) => {
     setWorkloadState(newWorkload);
+  }, []);
+
+  const setVisualBuilderDraft = useCallback((u: SetStateAction<VisualBuilderDraft>) => {
+    setVisualBuilderDraftState((prev) => (typeof u === 'function' ? u(prev) : u));
   }, []);
 
   const loadWorkloadFromFile = useCallback(async (file: File) => {
@@ -170,6 +233,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         workload,
         setMemspec,
         setWorkload,
+        visualBuilderDraft,
+        setVisualBuilderDraft,
         loadWorkloadFromFile,
         loadMemspecFromFile,
       }}

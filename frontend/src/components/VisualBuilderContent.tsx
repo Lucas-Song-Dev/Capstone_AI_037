@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { BuilderDIMMBoard } from '@/components/BuilderDIMMBoard';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,6 @@ import { useConfig } from '@/contexts/ConfigContext';
 import { computeCorePower, computeDIMMPower, formatPower } from '@/lib/ddr5Calculator';
 import type { MemSpec } from '@/lib/types';
 import {
-  getInitialBoardState,
   deriveArchitectureFromBoard,
   canAddRank,
   findBankGroupIdForNextBank,
@@ -46,13 +45,36 @@ export interface VisualBuilderContentProps {
 
 export function VisualBuilderContent({ onApply }: VisualBuilderContentProps) {
   const router = useRouter();
-  const { setMemspec } = useConfig();
-  const [boardState, setBoardState] = useState<BoardState>(getInitialBoardState);
-  const [width, setWidth] = useState<WidthOption>(8);
-  const [burstLength] = useState(16);
-  const [nbrOfColumns, setNbrOfColumns] = useState(1024);
-  const [nbrOfDevices, setNbrOfDevices] = useState<number>(8);
-  const [speed, setSpeed] = useState<number>(5600);
+  const { setMemspec, visualBuilderDraft, setVisualBuilderDraft } = useConfig();
+  const { boardState, width, nbrOfColumns, nbrOfDevices, speed } = visualBuilderDraft;
+  const burstLength = 16;
+
+  const setBoardState = useCallback(
+    (u: BoardState | ((prev: BoardState) => BoardState)) => {
+      setVisualBuilderDraft((prev) => ({
+        ...prev,
+        boardState: typeof u === 'function' ? u(prev.boardState) : u,
+      }));
+    },
+    [setVisualBuilderDraft]
+  );
+
+  const setWidth = useCallback(
+    (w: WidthOption) => setVisualBuilderDraft((prev) => ({ ...prev, width: w })),
+    [setVisualBuilderDraft]
+  );
+  const setNbrOfColumns = useCallback(
+    (c: number) => setVisualBuilderDraft((prev) => ({ ...prev, nbrOfColumns: c })),
+    [setVisualBuilderDraft]
+  );
+  const setNbrOfDevices = useCallback(
+    (d: number) => setVisualBuilderDraft((prev) => ({ ...prev, nbrOfDevices: d })),
+    [setVisualBuilderDraft]
+  );
+  const setSpeed = useCallback(
+    (s: number) => setVisualBuilderDraft((prev) => ({ ...prev, speed: s })),
+    [setVisualBuilderDraft]
+  );
 
   const { nbrOfRanks, nbrOfBankGroups, nbrOfBanks } = useMemo(
     () => deriveArchitectureFromBoard(boardState),
