@@ -2,6 +2,7 @@
   "memspec": {
     "memoryId": "micron_16gb_ddr5_6400_x8",
     "memoryType": "DDR5",
+    "registered": false,
     "memarchitecturespec": {
       "width": 16,
       "nbrOfBanks": 32,
@@ -10,6 +11,7 @@
       "nbrOfColumns": 1024,
       "nbrOfRows": 65536,
       "nbrOfDevices": 2,
+      "nbrOfDBs": 8,
       "burstLength": 16,
       "dataRate": 2
     },

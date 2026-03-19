@@ -323,6 +323,7 @@ def test_input_format_validation(results):
                 "memspec": {
                     "memoryId": "test",
                     "memoryType": "DDR5",
+                    "registered": "false",
                     "memarchitecturespec": {
                         "width": 8, "nbrOfBanks": 16, "nbrOfBankGroups": 2,
                         "nbrOfRanks": 1, "nbrOfColumns": 1024, "nbrOfRows": 65536,
@@ -352,6 +353,7 @@ def test_input_format_validation(results):
                 "memspec": {
                     "memoryId": "test",
                     "memoryType": "DDR5",
+                    "registered": "false",
                     "memarchitecturespec": {
                         "width": 8, "nbrOfBanks": 16, "nbrOfBankGroups": 2,
                         "nbrOfRanks": 1, "nbrOfColumns": 1024, "nbrOfRows": 65536,

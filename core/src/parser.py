@@ -17,6 +17,7 @@ class MemArchitectureSpec:
     nbrOfColumns: int
     nbrOfRows: int
     nbrOfDevices: int
+    nbrOfDBs: int
     burstLength: int
     dataRate: int
 
@@ -95,6 +96,7 @@ class MemTimingSpec:
 class MemSpec:
     memoryId: str
     memoryType: str
+    registered: bool
     memarchitecturespec: MemArchitectureSpec
     mempowerspec: MemPowerSpec
     memtimingspec: MemTimingSpec
@@ -148,6 +150,8 @@ def load_memspec(path: str) -> MemSpec:
     if "memtimingspec" not in raw:
         raise ValueError("Missing required section 'memtimingspec' in memspec")
     
+    register = bool(raw["registered"])
+    
     arch_raw = raw["memarchitecturespec"]
     p_raw = raw["mempowerspec"]
     t_raw = raw["memtimingspec"]
@@ -162,6 +166,7 @@ def load_memspec(path: str) -> MemSpec:
             nbrOfColumns    = int(arch_raw["nbrOfColumns"]),
             nbrOfRows       = int(arch_raw["nbrOfRows"]),
             nbrOfDevices       = int(arch_raw["nbrOfDevices"]),
+            nbrOfDBs        = int(arch_raw["nbrOfDBs"]),
             burstLength     = int(arch_raw["burstLength"]),
             dataRate        = int(arch_raw["dataRate"]),
         )
@@ -292,6 +297,7 @@ def load_memspec(path: str) -> MemSpec:
     return MemSpec(
         memoryId           = str(raw.get("memoryId", "")),
         memoryType         = memory_type,
+        registered          = register,
         memarchitecturespec = arch,
         mempowerspec        = power,
         memtimingspec       = timing,

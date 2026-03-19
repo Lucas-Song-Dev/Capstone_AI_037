@@ -32,6 +32,7 @@ def sample_memspec():
     return {
         "memoryId": "test_ddr5",
         "memoryType": "DDR5",
+        "registered": "false",
         "memarchitecturespec": {
             "width": 8,
             "nbrOfBanks": 16,
@@ -40,6 +41,7 @@ def sample_memspec():
             "nbrOfColumns": 1024,
             "nbrOfRows": 65536,
             "nbrOfDevices": 1,
+            "nbrOfDBs": 0,
             "burstLength": 16,
             "dataRate": 2
         },

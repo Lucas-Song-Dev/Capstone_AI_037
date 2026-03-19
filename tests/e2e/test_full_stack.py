@@ -68,6 +68,7 @@ class TestFullStackIntegration:
             "memspec": {
                 "memoryId": memspec.memoryId,
                 "memoryType": memspec.memoryType,
+                "registered": str(memspec.registered).lower(),
                 "memarchitecturespec": {
                     "width": memspec.memarchitecturespec.width,
                     "nbrOfBanks": memspec.memarchitecturespec.nbrOfBanks,
@@ -76,6 +77,7 @@ class TestFullStackIntegration:
                     "nbrOfColumns": memspec.memarchitecturespec.nbrOfColumns,
                     "nbrOfRows": memspec.memarchitecturespec.nbrOfRows,
                     "nbrOfDevices": memspec.memarchitecturespec.nbrOfDevices,
+                    "nbrOfDBs": memspec.memarchitecturespec.nbrOfDBs,
                     "burstLength": memspec.memarchitecturespec.burstLength,
                     "dataRate": memspec.memarchitecturespec.dataRate,
                 },
@@ -158,6 +160,7 @@ class TestFullStackIntegration:
             "memspec": {
                 "memoryId": memspec.memoryId,
                 "memoryType": memspec.memoryType,
+                "registered": str(memspec.registered).lower(),
                 "memarchitecturespec": {
                     "width": memspec.memarchitecturespec.width,
                     "nbrOfBanks": memspec.memarchitecturespec.nbrOfBanks,
@@ -166,6 +169,7 @@ class TestFullStackIntegration:
                     "nbrOfColumns": memspec.memarchitecturespec.nbrOfColumns,
                     "nbrOfRows": memspec.memarchitecturespec.nbrOfRows,
                     "nbrOfDevices": memspec.memarchitecturespec.nbrOfDevices,
+                    "nbrOfDBs": memspec.memarchitecturespec.nbrOfDBs,
                     "burstLength": memspec.memarchitecturespec.burstLength,
                     "dataRate": memspec.memarchitecturespec.dataRate,
                 },

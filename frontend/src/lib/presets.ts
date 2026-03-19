@@ -10,6 +10,7 @@ export const memoryPresets: MemoryPreset[] = [
     memspec: {
       memoryId: 'micron_16gb_ddr5_6400_x8',
       memoryType: 'DDR5',
+      registered: false,
       memarchitecturespec: {
         width: 8,
         nbrOfBanks: 16,
@@ -64,6 +65,7 @@ export const memoryPresets: MemoryPreset[] = [
     memspec: {
       memoryId: 'samsung_16gb_ddr5_4800_x8',
       memoryType: 'DDR5',
+      registered: false,
       memarchitecturespec: {
         width: 8,
         nbrOfBanks: 16,
@@ -118,6 +120,7 @@ export const memoryPresets: MemoryPreset[] = [
     memspec: {
       memoryId: 'sk_hynix_16gb_ddr5_5600_x8',
       memoryType: 'DDR5',
+      registered: false,
       memarchitecturespec: {
         width: 8,
         nbrOfBanks: 16,
@@ -172,6 +175,7 @@ export const memoryPresets: MemoryPreset[] = [
     memspec: {
       memoryId: 'micron_16gb_ddr5_4800_x8',
       memoryType: 'DDR5',
+      registered: false,
       memarchitecturespec: {
         width: 8,
         nbrOfBanks: 32,
@@ -226,6 +230,7 @@ export const memoryPresets: MemoryPreset[] = [
     memspec: {
       memoryId: 'skhynix_8gb_ddr5_4800_x16',
       memoryType: 'DDR5',
+      registered: false,
       memarchitecturespec: {
         width: 8,
         nbrOfBanks: 32,
@@ -280,6 +285,7 @@ export const memoryPresets: MemoryPreset[] = [
     memspec: {
       memoryId: 'skhynix_16gb_ddr5_4800_x8',
       memoryType: 'DDR5',
+      registered: false,
       memarchitecturespec: {
         width: 8,
         nbrOfBanks: 32,
@@ -334,6 +340,7 @@ export const memoryPresets: MemoryPreset[] = [
     memspec: {
       memoryId: 'skhynix_32gb_ddr5_4800_x8',
       memoryType: 'DDR5',
+      registered: false,
       memarchitecturespec: {
         width: 8,
         nbrOfBanks: 32,
