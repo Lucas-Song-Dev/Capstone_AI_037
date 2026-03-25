@@ -10,6 +10,9 @@ import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
+import { SpotlightTutorial } from '@/components/SpotlightTutorial';
+import { CORE_POWER_TUTORIAL_STEPS } from '@/config/spotlight-page-steps';
+import { ONBOARDING_CORE_POWER_KEY } from '@/lib/onboarding-storage';
 
 export default function CorePower() {
   const { memspec, workload } = useConfig();
@@ -19,20 +22,22 @@ export default function CorePower() {
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       <Header />
-      
+      <SpotlightTutorial storageKey={ONBOARDING_CORE_POWER_KEY} steps={CORE_POWER_TUTORIAL_STEPS} />
+
       <main className="flex-1 container mx-auto px-4 py-6 overflow-y-auto scrollbar-thin">
         {/* Navigation */}
-        <div className="mb-6 flex items-center justify-between">
-          <div>
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div data-tutorial="core-power-intro">
             <h1 className="text-3xl font-bold mb-2">Core Power Analysis</h1>
             <p className="text-muted-foreground">
               Detailed breakdown of DDR5 core power consumption per chip
             </p>
           </div>
           <Button
+            data-tutorial="core-power-back"
             variant="outline"
             onClick={() => router.push('/configuration')}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Configuration
@@ -57,17 +62,19 @@ export default function CorePower() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left Panel - Summary */}
           <div className="lg:col-span-4 space-y-6">
-            <TotalPowerDisplay powerResult={powerResult} />
-            <DDR5Chip3D powerResult={powerResult} memspec={memspec} />
+            <div data-tutorial="core-power-summary" className="space-y-6">
+              <TotalPowerDisplay powerResult={powerResult} />
+              <DDR5Chip3D powerResult={powerResult} memspec={memspec} />
+            </div>
           </div>
 
           {/* Center Panel - Details */}
-          <div className="lg:col-span-4 space-y-6">
+          <div className="lg:col-span-4 space-y-6" data-tutorial="core-power-details">
             <PowerDetails powerResult={powerResult} />
           </div>
 
           {/* Right Panel - Charts */}
-          <div className="lg:col-span-4 space-y-6">
+          <div className="lg:col-span-4 space-y-6" data-tutorial="core-power-charts">
             <PowerBreakdownChart powerResult={powerResult} />
             <PowerDistributionChart powerResult={powerResult} />
           </div>
