@@ -26,6 +26,9 @@ import { PowerBreakdownChart, TotalPowerDisplay } from "@/components/PowerChart"
 import { ServerRackVisualization } from "@/components/ServerRackVisualization";
 import { useConfig } from "@/contexts/ConfigContext";
 import { useRouter } from "next/navigation";
+import { SpotlightTutorial } from "@/components/SpotlightTutorial";
+import { SERVER_DEPLOYMENT_TUTORIAL_STEPS } from "@/config/spotlight-page-steps";
+import { ONBOARDING_SERVER_DEPLOYMENT_KEY } from "@/lib/onboarding-storage";
 
 export default function ServerDeployment() {
   const { setMemspec, setWorkload } = useConfig();
@@ -114,10 +117,11 @@ export default function ServerDeployment() {
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       <Header />
+      <SpotlightTutorial storageKey={ONBOARDING_SERVER_DEPLOYMENT_KEY} steps={SERVER_DEPLOYMENT_TUTORIAL_STEPS} />
       <main className="flex-1 container mx-auto px-4 py-6 overflow-y-auto scrollbar-thin">
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Header */}
-          <div className="text-center mb-6">
+          <div className="text-center mb-6" data-tutorial="server-deployment-intro">
             <h1 className="text-3xl font-bold mb-2 flex items-center justify-center gap-2">
               <Server className="w-8 h-8 text-primary" />
               Server Deployment Designer
@@ -128,7 +132,7 @@ export default function ServerDeployment() {
           </div>
 
           {/* Requirements Input Card */}
-          <Card className="power-card">
+          <Card className="power-card" data-tutorial="server-requirements-card">
             <CardHeader>
               <CardTitle>Server Requirements</CardTitle>
               <CardDescription>
@@ -136,7 +140,7 @@ export default function ServerDeployment() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-tutorial="server-req-hardware">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="power-budget">
@@ -259,7 +263,10 @@ export default function ServerDeployment() {
                     placeholder="8"
                   />
                 </div>
+              </div>
 
+              <div className="space-y-4" data-tutorial="server-req-fleet">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="num-servers">
@@ -326,9 +333,15 @@ export default function ServerDeployment() {
                     </SelectContent>
                   </Select>
                 </div>
+                </div>
               </div>
 
-              <Button onClick={handleSearch} disabled={loading} className="w-full">
+              <Button
+                data-tutorial="server-deployment-search"
+                onClick={handleSearch}
+                disabled={loading}
+                className="w-full"
+              >
                 {loading ? "Searching..." : "Find Configurations"}
               </Button>
 

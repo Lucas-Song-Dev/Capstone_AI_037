@@ -15,6 +15,9 @@ import { Upload, FileJson, CheckCircle2, AlertCircle, MemoryStick, Box } from 'l
 import { useConfig } from '@/contexts/ConfigContext';
 import { memoryPresets, workloadPresets } from '@/lib/presets';
 import { useRouter } from 'next/navigation';
+import { SpotlightTutorial } from '@/components/SpotlightTutorial';
+import { CONFIGURATION_TUTORIAL_STEPS } from '@/config/spotlight-page-steps';
+import { ONBOARDING_CONFIGURATION_KEY } from '@/lib/onboarding-storage';
 
 export default function Configuration() {
   const { memspec, workload, setMemspec, setWorkload, loadWorkloadFromFile, loadMemspecFromFile } = useConfig();
@@ -131,10 +134,11 @@ export default function Configuration() {
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       <Header />
-      
+      <SpotlightTutorial storageKey={ONBOARDING_CONFIGURATION_KEY} steps={CONFIGURATION_TUTORIAL_STEPS} />
+
       <main className="flex-1 container mx-auto px-4 py-6 overflow-y-auto scrollbar-thin">
         <div className="max-w-6xl mx-auto">
-          <div className="mb-6">
+          <div className="mb-6" data-tutorial="configuration-intro">
             <h1 className="text-3xl font-bold mb-2">Configuration</h1>
             <p className="text-muted-foreground">
               Configure memory specifications and workload parameters. Select a preset, build your own DIMM, or upload custom JSON files.
@@ -142,7 +146,7 @@ export default function Configuration() {
           </div>
 
           <Tabs value={memorySource} onValueChange={(v) => setMemorySource(v as 'preset' | 'build')} className="w-full">
-            <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+            <TabsList className="grid w-full max-w-md grid-cols-2 mb-6" data-tutorial="configuration-tabs">
               <TabsTrigger value="preset" className="flex items-center gap-2">
                 <MemoryStick className="w-4 h-4" />
                 Preset
@@ -155,7 +159,7 @@ export default function Configuration() {
 
             <TabsContent value="preset" className="mt-0">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-6">
+            <div className="space-y-6" data-tutorial="configuration-presets">
               <PresetSelector
                 selectedMemoryId={selectedMemoryId}
                 selectedWorkloadId={selectedWorkloadId}
@@ -165,16 +169,18 @@ export default function Configuration() {
                 defaultManufacturer={selectedManufacturer}
               />
               
-              <ConfigPanel
-                memspec={memspec}
-                workload={workload}
-                onMemspecChange={setMemspec}
-                onWorkloadChange={setWorkload}
-              />
+              <div data-tutorial="configuration-panel">
+                <ConfigPanel
+                  memspec={memspec}
+                  workload={workload}
+                  onMemspecChange={setMemspec}
+                  onWorkloadChange={setWorkload}
+                />
+              </div>
             </div>
 
             {/* Right Column - File Uploads */}
-            <div className="space-y-6">
+            <div className="space-y-6" data-tutorial="configuration-uploads">
               {/* Memory Spec Upload */}
               <Card className="power-card">
                 <CardHeader className="!p-4 !pb-2">
@@ -308,7 +314,7 @@ export default function Configuration() {
               </Card>
 
               {/* Navigation Buttons */}
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 pt-4" data-tutorial="configuration-power-nav">
                 <Button
                   onClick={() => router.push('/core-power')}
                   className="flex-1"

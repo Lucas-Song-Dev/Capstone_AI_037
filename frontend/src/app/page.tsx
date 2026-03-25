@@ -1,9 +1,12 @@
 'use client';
 
 import { Header } from '@/components/Header';
+import { SpotlightTutorial } from '@/components/SpotlightTutorial';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Settings, Zap, MemoryStick, FileJson, Play } from 'lucide-react';
+import { HOME_TUTORIAL_STEPS } from '@/config/spotlight-page-steps';
+import { ONBOARDING_HOME_KEY } from '@/lib/onboarding-storage';
+import { Settings, Zap, MemoryStick, FileJson, Play } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function Home() {
@@ -12,21 +15,25 @@ export default function Home() {
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       <Header />
-      
+      <SpotlightTutorial storageKey={ONBOARDING_HOME_KEY} steps={HOME_TUTORIAL_STEPS} />
+
       <main className="flex-1 container mx-auto px-4 py-6 overflow-y-auto scrollbar-thin">
         <div className="max-w-4xl mx-auto">
-          {/* Hero Section */}
-          <div className="text-center mb-12 mt-8">
-            <h1 className="text-4xl font-bold mb-4">
-              DDR5 <span className="gradient-text">Power Calculator</span>
-            </h1>
-            <p className="text-xl text-muted-foreground mb-8">
-              JEDEC-compliant power modeling for DDR5 memory modules
-            </p>
+          {/* Hero Section — flex column keeps Get Started centered when spotlight applies z-index */}
+          <div className="flex flex-col items-center mb-12 mt-8 gap-6">
+            <div data-tutorial="hero-intro" className="text-center max-w-2xl mx-auto px-2">
+              <h1 className="text-4xl font-bold mb-4">
+                DDR5 <span className="gradient-text">Power Calculator</span>
+              </h1>
+              <p className="text-xl text-muted-foreground">
+                JEDEC-compliant power modeling for DDR5 memory modules
+              </p>
+            </div>
             <Button
+              data-tutorial="get-started"
               size="lg"
               onClick={() => router.push('/configuration')}
-              className="text-lg px-8"
+              className="text-lg px-8 shrink-0"
             >
               <Play className="w-5 h-5 mr-2" />
               Get Started
@@ -38,7 +45,7 @@ export default function Home() {
             <h2 className="text-2xl font-semibold mb-6 text-center">How to Use</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Step 1 */}
-              <Card className="power-card">
+              <Card className="power-card" data-tutorial="how-to-configure">
                 <CardHeader className="!p-4 !pb-2">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
@@ -63,7 +70,7 @@ export default function Home() {
               </Card>
 
               {/* Step 2 */}
-              <Card className="power-card">
+              <Card className="power-card" data-tutorial="how-to-core-power">
                 <CardHeader className="!p-4 !pb-2">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
@@ -88,7 +95,7 @@ export default function Home() {
               </Card>
 
               {/* Step 3 */}
-              <Card className="power-card">
+              <Card className="power-card" data-tutorial="how-to-dimm-power">
                 <CardHeader className="!p-4 !pb-2">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
@@ -115,7 +122,7 @@ export default function Home() {
           </div>
 
           {/* Features Section */}
-          <div className="mb-12">
+          <div className="mb-12" data-tutorial="home-features">
             <h2 className="text-2xl font-semibold mb-6 text-center">Features</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card className="power-card">

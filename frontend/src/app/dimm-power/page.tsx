@@ -8,6 +8,9 @@ import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
+import { SpotlightTutorial } from '@/components/SpotlightTutorial';
+import { DIMM_POWER_TUTORIAL_STEPS } from '@/config/spotlight-page-steps';
+import { ONBOARDING_DIMM_POWER_KEY } from '@/lib/onboarding-storage';
 
 export default function DIMMPower() {
   const { memspec, workload } = useConfig();
@@ -17,20 +20,22 @@ export default function DIMMPower() {
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       <Header />
-      
+      <SpotlightTutorial storageKey={ONBOARDING_DIMM_POWER_KEY} steps={DIMM_POWER_TUTORIAL_STEPS} />
+
       <main className="flex-1 container mx-auto px-4 py-6 overflow-y-auto scrollbar-thin">
         {/* Navigation */}
-        <div className="mb-6 flex items-center justify-between">
-          <div>
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div data-tutorial="dimm-power-intro">
             <h1 className="text-3xl font-bold mb-2">Total DIMM Power Analysis</h1>
             <p className="text-muted-foreground">
               Complete DIMM power consumption including core, interface, and overhead components
             </p>
           </div>
           <Button
+            data-tutorial="dimm-power-back"
             variant="outline"
             onClick={() => router.push('/configuration')}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Configuration
@@ -52,12 +57,12 @@ export default function DIMMPower() {
         )}
 
         {/* DIMM Power Visualization */}
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl mx-auto" data-tutorial="dimm-power-visual">
           <DIMMPowerVisualizer dimmPower={dimmPowerResult} memspec={memspec} />
         </div>
 
         {/* Footer */}
-        <footer className="mt-8 pt-6 border-t border-border">
+        <footer className="mt-8 pt-6 border-t border-border" data-tutorial="dimm-power-footer">
           <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-muted-foreground">
             <p>DDR5 Power Calculator • Based on JEDEC JESD79-5 specifications</p>
             <div className="flex items-center gap-4">

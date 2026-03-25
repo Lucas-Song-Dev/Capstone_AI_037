@@ -25,6 +25,9 @@ import type { PowerResult, DIMMPowerResult } from "@/lib/types";
 import { inverseSearchForTarget } from "@/lib/inverseDDR5";
 import { useRouter } from "next/navigation";
 import { PowerBreakdownChart, TotalPowerDisplay } from "@/components/PowerChart";
+import { SpotlightTutorial } from "@/components/SpotlightTutorial";
+import { TARGET_POWER_TUTORIAL_STEPS } from "@/config/spotlight-page-steps";
+import { ONBOARDING_TARGET_POWER_KEY } from "@/lib/onboarding-storage";
 
 type InverseResult = {
   basePresetId: string;
@@ -113,14 +116,18 @@ export default function TargetPower() {
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       <Header />
+      <SpotlightTutorial storageKey={ONBOARDING_TARGET_POWER_KEY} steps={TARGET_POWER_TUTORIAL_STEPS} />
       <main className="flex-1 container mx-auto px-4 py-6 overflow-y-auto scrollbar-thin">
         <div className="max-w-3xl mx-auto space-y-6">
           <Card className="power-card">
-            <CardHeader>
+            <CardHeader data-tutorial="target-power-header">
               <CardTitle>Target Power (Inverse DDR5)</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div
+                className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                data-tutorial="target-power-optimization"
+              >
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <label className="block text-xs font-medium text-muted-foreground">
@@ -201,6 +208,7 @@ export default function TargetPower() {
                 </div>
               </div>
 
+              <div className="space-y-4" data-tutorial="target-power-targets">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <label className="block text-sm mb-1">
@@ -263,8 +271,9 @@ export default function TargetPower() {
                   className="max-w-xs"
                 />
               </div>
+              </div>
 
-              <Button onClick={handleSubmit} disabled={loading}>
+              <Button data-tutorial="target-power-submit" onClick={handleSubmit} disabled={loading}>
                 {loading ? "Solving..." : "Find Matching Spec"}
               </Button>
 
@@ -274,7 +283,7 @@ export default function TargetPower() {
                 </Alert>
               )}
 
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground" data-tutorial="target-power-note">
                 This feature finds a DDR5 memspec whose modeled core power best
                 matches your target. Results are approximate and may not be
                 unique.
