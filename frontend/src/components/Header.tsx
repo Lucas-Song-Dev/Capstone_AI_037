@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { MemoryStick, Github, Info, Settings, Zap, MemoryStick as DIMMIcon, Target, Server } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,9 +11,40 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { PresentationModeHighlighter } from '@/components/PresentationModeHighlighter';
+import { createPortal } from 'react-dom';
 
 export function Header() {
   const pathname = usePathname();
+  const [presentationOn, setPresentationOn] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const presentationToggle = useMemo(() => {
+    if (!mounted || typeof document === 'undefined') return null;
+
+    const z = presentationOn ? 650 : 105;
+    return createPortal(
+      <div
+        className="fixed top-4 right-20 md:right-24 pointer-events-auto"
+        style={{ zIndex: z }}
+      >
+        <Button
+          type="button"
+          size="sm"
+          variant={presentationOn ? 'secondary' : 'outline'}
+          className="bg-card/95 shadow-md"
+          onClick={() => setPresentationOn((v) => !v)}
+        >
+          presentation mode
+        </Button>
+      </div>,
+      document.body,
+    );
+  }, [mounted, presentationOn]);
 
   const designConfigGroup = [
     { path: '/target-power', label: 'Inverse Design', icon: Target },
@@ -46,7 +78,10 @@ export function Header() {
   };
 
   return (
-    <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+    <>
+      {presentationToggle}
+      <PresentationModeHighlighter active={presentationOn} />
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
@@ -110,5 +145,6 @@ export function Header() {
         </div>
       </div>
     </header>
+    </>
   );
 }
