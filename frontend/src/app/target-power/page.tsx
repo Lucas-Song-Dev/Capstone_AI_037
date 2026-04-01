@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Header } from "@/components/Header";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -117,8 +117,19 @@ export default function TargetPower() {
           <Card className="power-card">
             <CardHeader data-tutorial="target-power-header">
               <CardTitle>Target Power (Inverse DDR5)</CardTitle>
+              <CardDescription className="text-sm pt-1">
+                The search is <strong className="font-medium text-foreground">deterministic</strong>: same targets,
+                workload, profile, emphasis, and sample budget always yield the same best match. Randomness is only
+                used internally with a fixed seed derived from those inputs.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <p className="text-xs text-muted-foreground border border-border/60 rounded-md px-3 py-2 bg-muted/20">
+                <strong className="text-foreground/90">Profile &amp; emphasis:</strong> they weight core vs module
+                errors in the loss. If optional DIMM target is empty, only core error is optimized; scaling it by a
+                constant does not change which candidate wins, so the dropdown/slider have little effect until you set
+                a DIMM power target.
+              </p>
               <div
                 className="grid grid-cols-1 md:grid-cols-2 gap-4"
                 data-tutorial="target-power-optimization"

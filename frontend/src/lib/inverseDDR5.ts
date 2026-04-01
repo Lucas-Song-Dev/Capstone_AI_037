@@ -73,25 +73,47 @@ function cloneMemspec(memspec: MemSpec): MemSpec {
   return JSON.parse(JSON.stringify(memspec));
 }
 
-function randomInRange(min: number, max: number): number {
-  return min + Math.random() * (max - min);
+/** FNV-1a 32-bit — stable string seed for reproducible inverse search. */
+function hashStringToSeed(input: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
 }
 
-function perturbMemspec(base: MemSpec): MemSpec {
+/** Deterministic PRNG (mulberry32) so identical inputs yield identical search results. */
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function randomInRange(rng: () => number, min: number, max: number): number {
+  return min + rng() * (max - min);
+}
+
+function perturbMemspec(base: MemSpec, rng: () => number): MemSpec {
   const m = cloneMemspec(base);
   const p = m.mempowerspec;
 
   for (const key of TUNABLE_CURRENT_KEYS) {
     const [lo, hi] = CURRENT_FACTOR_BOUNDS[key as string];
-    const factor = randomInRange(lo, hi);
+    const factor = randomInRange(rng, lo, hi);
     // currents are in mA
     (p as any)[key] = (p as any)[key] * factor;
   }
 
   const [vddLo, vddHi] = VOLTAGE_BOUNDS.vdd;
   const [vppLo, vppHi] = VOLTAGE_BOUNDS.vpp;
-  p.vdd = randomInRange(vddLo, vddHi);
-  p.vpp = randomInRange(vppLo, vppHi);
+  p.vdd = randomInRange(rng, vddLo, vddHi);
+  p.vpp = randomInRange(rng, vppLo, vppHi);
 
   return m;
 }
@@ -166,6 +188,14 @@ export async function inverseSearchForTarget(
   };
   const samplesPerPreset = options?.samplesPerPreset ?? 300;
 
+  const seedPayload = JSON.stringify({
+    workload,
+    target,
+    weights,
+    samplesPerPreset,
+  });
+  const rng = mulberry32(hashStringToSeed(seedPayload));
+
   let bestOverall: InverseResult | null = null;
 
   const presets: MemoryPreset[] = memoryPresets;
@@ -174,7 +204,7 @@ export async function inverseSearchForTarget(
     let bestForPreset: InverseResult | null = null;
 
     for (let i = 0; i < samplesPerPreset; i++) {
-      const candidateMemspec = perturbMemspec(preset.memspec);
+      const candidateMemspec = perturbMemspec(preset.memspec, rng);
       const power = computeCorePower(candidateMemspec, workload);
       const dimmPower = computeDIMMPower(power, candidateMemspec);
 
