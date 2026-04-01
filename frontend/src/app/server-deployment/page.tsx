@@ -15,12 +15,8 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, Zap, MemoryStick, Gauge, Server, HelpCircle } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { CheckCircle2, XCircle, Zap, MemoryStick, Gauge, Server } from "lucide-react";
+import { HelpTooltip } from "@/components/HelpTooltip";
 import { findServerConfigurations, formatServerSummary, type ServerRequirements, type ServerConfiguration } from "@/lib/serverDeployment";
 import { PowerBreakdownChart, TotalPowerDisplay } from "@/components/PowerChart";
 import { ServerRackVisualization } from "@/components/ServerRackVisualization";
@@ -146,22 +142,15 @@ export default function ServerDeployment() {
                     <Label htmlFor="power-budget">
                       Power Budget per Server (W)
                     </Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button type="button" className="inline-flex items-center">
-                          <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs p-3 bg-popover border border-border shadow-lg">
-                        <p className="text-sm">
-                          <strong>How much electricity can the memory use?</strong><br />
-                          Like a light bulb that can only use so much power, your server has a limit. 
-                          This is the maximum amount of electricity (in Watts) that all the memory 
-                          in one server is allowed to use. Lower numbers mean less power, which saves 
-                          money and keeps things cooler!
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
+                    <HelpTooltip label="Help: power budget per server">
+                      <p className="text-sm">
+                        <strong>How much electricity can the memory use?</strong><br />
+                        Like a light bulb that can only use so much power, your server has a limit. 
+                        This is the maximum amount of electricity (in Watts) that all the memory 
+                        in one server is allowed to use. Lower numbers mean less power, which saves 
+                        money and keeps things cooler!
+                      </p>
+                    </HelpTooltip>
                   </div>
                   <Input
                     id="power-budget"
@@ -178,20 +167,15 @@ export default function ServerDeployment() {
                     <Label htmlFor="min-data-rate">
                       Minimum Data Rate (MT/s)
                     </Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p className="text-sm">
-                          <strong>How fast should the memory be?</strong><br />
-                          Think of this like the speed limit on a highway. The memory needs to be 
-                          at least this fast (measured in millions of transfers per second). 
-                          Higher numbers mean faster memory, which helps your server work quicker. 
-                          Like a race car vs a regular car!
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
+                    <HelpTooltip label="Help: minimum data rate">
+                      <p className="text-sm">
+                        <strong>How fast should the memory be?</strong><br />
+                        Think of this like the speed limit on a highway. The memory needs to be 
+                        at least this fast (measured in millions of transfers per second). 
+                        Higher numbers mean faster memory, which helps your server work quicker. 
+                        Like a race car vs a regular car!
+                      </p>
+                    </HelpTooltip>
                   </div>
                   <Input
                     id="min-data-rate"
@@ -208,19 +192,14 @@ export default function ServerDeployment() {
                     <Label htmlFor="total-capacity">
                       Total Memory Capacity (GB)
                     </Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p className="text-sm">
-                          <strong>How much memory do you need?</strong><br />
-                          This is like the size of a backpack - how much stuff (data) can it hold? 
-                          More GB (gigabytes) means more space to store information. If you need to 
-                          remember lots of things at once, you need a bigger backpack!
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
+                    <HelpTooltip label="Help: total memory capacity">
+                      <p className="text-sm">
+                        <strong>How much memory do you need?</strong><br />
+                        This is like the size of a backpack - how much stuff (data) can it hold? 
+                        More GB (gigabytes) means more space to store information. If you need to 
+                        remember lots of things at once, you need a bigger backpack!
+                      </p>
+                    </HelpTooltip>
                   </div>
                   <Input
                     id="total-capacity"
@@ -237,20 +216,15 @@ export default function ServerDeployment() {
                     <Label htmlFor="max-dimms">
                       Maximum DIMM Slots per Server
                     </Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p className="text-sm">
-                          <strong>How many memory sticks can fit?</strong><br />
-                          A DIMM is like a memory stick (like a USB stick, but for memory). 
-                          Your server has slots where you can plug in these sticks. This number 
-                          tells us the maximum number of slots available. More slots means you 
-                          can add more memory sticks!
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
+                    <HelpTooltip label="Help: maximum DIMM slots">
+                      <p className="text-sm">
+                        <strong>How many memory sticks can fit?</strong><br />
+                        A DIMM is like a memory stick (like a USB stick, but for memory). 
+                        Your server has slots where you can plug in these sticks. This number 
+                        tells us the maximum number of slots available. More slots means you 
+                        can add more memory sticks!
+                      </p>
+                    </HelpTooltip>
                   </div>
                   <Input
                     id="max-dimms"
@@ -272,19 +246,14 @@ export default function ServerDeployment() {
                     <Label htmlFor="num-servers">
                       Number of Servers
                     </Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p className="text-sm">
-                          <strong>How many servers do you need?</strong><br />
-                          Enter the total number of servers in your deployment. 
-                          Supports large-scale deployments up to 1,000,000 servers. 
-                          The visualization will show server racks with cubes representing each server.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
+                    <HelpTooltip label="Help: number of servers">
+                      <p className="text-sm">
+                        <strong>How many servers do you need?</strong><br />
+                        Enter the total number of servers in your deployment. 
+                        Supports large-scale deployments up to 1,000,000 servers. 
+                        The visualization will show server racks with cubes representing each server.
+                      </p>
+                    </HelpTooltip>
                   </div>
                   <Input
                     id="num-servers"
@@ -301,20 +270,15 @@ export default function ServerDeployment() {
                 <div className="space-y-2 md:col-span-2">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="workload-type">Workload Type</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p className="text-sm">
-                          <strong>What will your server be doing?</strong><br />
-                          This is like asking: will you be reading books, writing stories, or both? 
-                          Different jobs use memory differently. Some read a lot (like looking up 
-                          information), some write a lot (like saving new data), and some do both 
-                          equally. Pick the one that matches what your server will do most!
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
+                    <HelpTooltip label="Help: workload type">
+                      <p className="text-sm">
+                        <strong>What will your server be doing?</strong><br />
+                        This is like asking: will you be reading books, writing stories, or both? 
+                        Different jobs use memory differently. Some read a lot (like looking up 
+                        information), some write a lot (like saving new data), and some do both 
+                        equally. Pick the one that matches what your server will do most!
+                      </p>
+                    </HelpTooltip>
                   </div>
                   <Select
                     value={workloadType}
@@ -325,7 +289,7 @@ export default function ServerDeployment() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="database_web">Database/Web (Mixed)</SelectItem>
-                      <SelectItem value="balanced">Balanced</SelectItem>
+                      <SelectItem value="balanced">Balanced activity (read/write mix)</SelectItem>
                       <SelectItem value="read_heavy">Read Heavy</SelectItem>
                       <SelectItem value="write_heavy">Write Heavy</SelectItem>
                       <SelectItem value="idle">Idle</SelectItem>

@@ -20,6 +20,14 @@ def test_health_check_endpoint(client):
     assert response.json()["status"] == "healthy"
 
 
+def test_health_under_api_prefix_matches_health(client):
+    """GET /api/health matches /health (used when requests are under /api/* on Vercel)."""
+    r1 = client.get("/health")
+    r2 = client.get("/api/health")
+    assert r2.status_code == 200
+    assert r1.json() == r2.json()
+
+
 def test_calculate_core_power(client, sample_memspec, sample_workload):
     """Test core power calculation endpoint."""
     request_data = {

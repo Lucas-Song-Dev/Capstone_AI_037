@@ -13,40 +13,13 @@ import {
   Pie,
   Cell,
   Legend,
-  TooltipProps,
 } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { PowerResult } from '@/lib/types';
 import { formatPower } from '@/lib/ddr5Calculator';
+import { ChartTooltipSimple, makeSeriesTooltipContent } from '@/components/recharts/chartTooltip';
 
-// Custom tooltip component with proper styling
-const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
-  if (active && payload && payload.length) {
-    const entry = payload[0];
-    const value = typeof entry.value === 'number' ? entry.value : 0;
-    const displayLabel = label || entry.name || 'Value';
-    
-    return (
-      <div
-        style={{
-          backgroundColor: 'hsl(222, 47%, 14%)',
-          border: '1px solid hsl(217, 32%, 22%)',
-          borderRadius: '8px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          padding: '8px 12px',
-        }}
-      >
-        <p style={{ color: 'hsl(210, 40%, 98%)', fontWeight: 500, marginBottom: '4px', marginTop: 0 }}>
-          {displayLabel}
-        </p>
-        <p style={{ color: 'hsl(210, 40%, 98%)', margin: 0 }}>
-          {value.toFixed(2)} mW
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
+const CorePowerBarTooltip = makeSeriesTooltipContent({ valueDecimals: 2, unitSuffix: 'mW' });
 
 interface PowerChartProps {
   powerResult: PowerResult | null;
@@ -94,6 +67,9 @@ export function PowerBreakdownChart({ powerResult }: PowerChartProps) {
     <Card className="power-card">
       <CardHeader className="!p-4 !pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">Power Breakdown (mW)</CardTitle>
+        <CardDescription className="text-xs pt-1">
+          Per-component bars are in milliwatts (core contributions × 1000). Summary totals on this page use watts from the same modeled values—divide the bar stack by 1000 to compare to headline W.
+        </CardDescription>
       </CardHeader>
       <CardContent className="!p-4 !pt-0">
         <ResponsiveContainer width="100%" height={220}>
@@ -111,7 +87,7 @@ export function PowerBreakdownChart({ powerResult }: PowerChartProps) {
               axisLine={{ stroke: 'hsl(217, 32%, 22%)' }}
               tickLine={{ stroke: 'hsl(217, 32%, 22%)' }}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={CorePowerBarTooltip} />
             <Bar 
               dataKey="value" 
               radius={[4, 4, 0, 0]}
@@ -157,6 +133,9 @@ export function PowerDistributionChart({ powerResult }: PowerChartProps) {
     <Card className="power-card">
       <CardHeader className="!p-4 !pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">VDD vs VPP Distribution</CardTitle>
+        <CardDescription className="text-xs pt-1">
+          Slice values are milliwatts of core power on each rail. VDD + VPP in mW correspond to the watt-scale VDD/VPP lines in the total summary (same physics, different unit for chart readability).
+        </CardDescription>
       </CardHeader>
       <CardContent className="!p-4 !pt-0">
         <ResponsiveContainer width="100%" height={220}>
@@ -174,31 +153,17 @@ export function PowerDistributionChart({ powerResult }: PowerChartProps) {
                 <Cell key={`cell-${index}`} fill={entry.color} />
               ))}
             </Pie>
-            <Tooltip 
+            <Tooltip
               content={(props) => {
-                if (props.active && props.payload && props.payload.length) {
-                  const entry = props.payload[0];
-                  const value = typeof entry.value === 'number' ? entry.value : 0;
-                  return (
-                    <div
-                      style={{
-                        backgroundColor: 'hsl(222, 47%, 14%)',
-                        border: '1px solid hsl(217, 32%, 22%)',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                        padding: '8px 12px',
-                      }}
-                    >
-                      <p style={{ color: 'hsl(210, 40%, 98%)', fontWeight: 500, marginBottom: '4px' }}>
-                        {entry.name || 'Value'}
-                      </p>
-                      <p style={{ color: 'hsl(210, 40%, 98%)', margin: 0 }}>
-                        {`${value.toFixed(2)} mW (${((value / total) * 100).toFixed(1)}%)`}
-                      </p>
-                    </div>
-                  );
-                }
-                return null;
+                if (!props.active || !props.payload?.length) return null;
+                const entry = props.payload[0];
+                const value = typeof entry.value === 'number' ? entry.value : 0;
+                return (
+                  <ChartTooltipSimple
+                    title={entry.name || 'Value'}
+                    valueText={`${value.toFixed(2)} mW (${((value / total) * 100).toFixed(1)}%)`}
+                  />
+                );
               }}
             />
             <Legend 

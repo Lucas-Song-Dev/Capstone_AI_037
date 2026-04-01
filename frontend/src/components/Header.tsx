@@ -1,50 +1,37 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MemoryStick, Github, Info, Settings, Zap, MemoryStick as DIMMIcon, Target, Server } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { LinkIconTooltip } from '@/components/HelpTooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { ONBOARDING_CONFIGURATION_KEY, isOnboardingComplete } from '@/lib/onboarding-storage';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { PresentationModeHighlighter } from '@/components/PresentationModeHighlighter';
-import { createPortal } from 'react-dom';
 
 export function Header() {
   const pathname = usePathname();
-  const [presentationOn, setPresentationOn] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [isConfigurationUnlocked, setIsConfigurationUnlocked] = useState(() =>
+    isOnboardingComplete(ONBOARDING_CONFIGURATION_KEY)
+  );
 
   useEffect(() => {
-    setMounted(true);
+    const sync = () => setIsConfigurationUnlocked(isOnboardingComplete(ONBOARDING_CONFIGURATION_KEY));
+    sync();
+    window.addEventListener('storage', sync);
+    window.addEventListener('ddr5:onboarding-updated', sync as EventListener);
+    window.addEventListener('focus', sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('ddr5:onboarding-updated', sync as EventListener);
+      window.removeEventListener('focus', sync);
+    };
   }, []);
 
-  const presentationToggle = useMemo(() => {
-    if (!mounted || typeof document === 'undefined') return null;
-
-    const z = presentationOn ? 650 : 105;
-    return createPortal(
-      <div
-        className="fixed top-4 right-20 md:right-24 pointer-events-auto"
-        style={{ zIndex: z }}
-      >
-        <Button
-          type="button"
-          size="sm"
-          variant={presentationOn ? 'secondary' : 'outline'}
-          className="bg-card/95 shadow-md"
-          onClick={() => setPresentationOn((v) => !v)}
-        >
-          presentation mode
-        </Button>
-      </div>,
-      document.body,
-    );
-  }, [mounted, presentationOn]);
+  useEffect(() => {
+    setIsConfigurationUnlocked(isOnboardingComplete(ONBOARDING_CONFIGURATION_KEY));
+  }, [pathname]);
 
   const designConfigGroup = [
     { path: '/target-power', label: 'Inverse Design', icon: Target },
@@ -56,17 +43,48 @@ export function Header() {
     { path: '/dimm-power', label: 'DIMM Power', icon: DIMMIcon },
   ];
 
-  const NavButton = ({ item }: { item: { path: string; label: string; icon: typeof Settings } }) => {
+  const NavButton = ({
+    item,
+    locked = false,
+  }: {
+    item: { path: string; label: string; icon: typeof Settings };
+    locked?: boolean;
+  }) => {
     const Icon = item.icon;
     const isActive = pathname === item.path;
+    const isConfigurationTab = item.path === '/configuration';
+    if (locked) {
+      return (
+        <Tooltip delayDuration={120}>
+          <TooltipTrigger asChild>
+            <div
+              aria-disabled="true"
+              data-testid={`locked-nav-${item.path}`}
+              className="inline-flex h-8 px-3 text-xs items-center justify-center gap-2 whitespace-nowrap rounded-md opacity-45 cursor-help"
+            >
+              <Icon className="w-3.5 h-3.5 mr-1.5" />
+              {item.label}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent
+            side="bottom"
+            className="max-w-xs bg-muted text-muted-foreground border border-border shadow-sm"
+          >
+            <p className="text-sm">Please select a configuration.</p>
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
     return (
       <Button
-        variant={isActive ? 'secondary' : 'ghost'}
+        variant={isConfigurationTab ? 'outline' : isActive ? 'secondary' : 'ghost'}
         size="sm"
         asChild
         className={cn(
           'h-8 px-3 text-xs',
-          isActive && 'bg-primary/10 text-primary'
+          isConfigurationTab
+            ? 'border-white/90 text-white hover:bg-white/10 hover:text-white'
+            : isActive && 'bg-primary/10 text-primary'
         )}
       >
         <Link href={item.path}>
@@ -78,10 +96,7 @@ export function Header() {
   };
 
   return (
-    <>
-      {presentationToggle}
-      <PresentationModeHighlighter active={presentationOn} />
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+    <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
@@ -100,7 +115,6 @@ export function Header() {
           </Link>
 
           <div className="flex items-center gap-2">
-            {/* Navigation: Design & config | Power (Visual Builder is inside Configuration tab) */}
             <nav className="hidden md:flex items-center gap-1 mr-4">
               <div className="flex items-center gap-1">
                 {designConfigGroup.map((item) => (
@@ -110,31 +124,27 @@ export function Header() {
               <div className="h-5 w-px bg-border mx-2" aria-hidden />
               <div className="flex items-center gap-1">
                 {powerGroup.map((item) => (
-                  <NavButton key={item.path} item={item} />
+                  <NavButton key={item.path} item={item} locked={!isConfigurationUnlocked} />
                 ))}
               </div>
             </nav>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                  <Link href="/sources" aria-label="View Sources">
-                    <Info className="w-4 h-4" />
-                  </Link>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-xs">
-                <p className="text-sm">
-                  DDR5 power calculator based on JEDEC specifications.
-                  Supports IDD/IPP current measurements and workload modeling.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-            
+            <LinkIconTooltip
+              href="/sources"
+              label="View Sources"
+              side="bottom"
+              icon={<Info className="w-4 h-4" />}
+            >
+              <p className="text-sm">
+                DDR5 power calculator based on JEDEC specifications.
+                Supports IDD/IPP current measurements and workload modeling.
+              </p>
+            </LinkIconTooltip>
+
             <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-              <a 
-                href="https://github.com/Lucas-Song-Dev/Capstone_AI_037" 
-                target="_blank" 
+              <a
+                href="https://github.com/Lucas-Song-Dev/Capstone_AI_037"
+                target="_blank"
                 rel="noopener noreferrer"
                 aria-label="View on GitHub"
               >
@@ -145,6 +155,5 @@ export function Header() {
         </div>
       </div>
     </header>
-    </>
   );
 }

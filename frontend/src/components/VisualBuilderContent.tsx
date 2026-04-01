@@ -283,11 +283,20 @@ export function VisualBuilderContent({ onApply }: VisualBuilderContentProps) {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-2">Width (bits)</label>
-              <div className="flex items-center gap-2">
-                <Slider value={[width]} onValueChange={([v]) => setWidth(v as WidthOption)} min={WIDTH_MIN} max={WIDTH_MAX} step={8} className="flex-1" />
-                <span className="text-sm tabular-nums w-8">{width}-bit</span>
+              <label className="text-xs font-medium text-muted-foreground block mb-2">Device width (I/O)</label>
+              <div className="flex items-center gap-2 mb-1 max-w-xs">
+                <span className="text-[10px] text-muted-foreground w-9 shrink-0">8-bit</span>
+                <Slider
+                  value={[width]}
+                  onValueChange={([v]) => setWidth(v as WidthOption)}
+                  min={WIDTH_MIN}
+                  max={WIDTH_MAX}
+                  step={8}
+                  className="flex-1"
+                />
+                <span className="text-[10px] text-muted-foreground w-9 shrink-0 text-right">16-bit</span>
               </div>
+              <p className="text-xs text-muted-foreground tabular-nums">Selected: {width}-bit</p>
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground block mb-2">Burst length</label>

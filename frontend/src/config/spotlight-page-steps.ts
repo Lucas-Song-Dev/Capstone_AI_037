@@ -10,7 +10,7 @@ export const HOME_TUTORIAL_STEPS: SpotlightStep[] = [
   {
     selector: '[data-tutorial="get-started"]',
     title: 'Get started',
-    body: 'Use this button to open Configuration. There you can pick vendor presets, paste or upload JSON memspecs and workloads, or use the visual DIMM builder. Changes persist in the browser so you can hop between pages without losing work.',
+    body: 'Use this button to open Configuration. There you can pick vendor presets, tune every workload field in the panel, upload a memspec JSON when you already have lab data, or use the visual DIMM builder. Changes persist in the browser so you can hop between pages without losing work.',
     placement: 'bottom',
   },
   {
@@ -34,7 +34,7 @@ export const HOME_TUTORIAL_STEPS: SpotlightStep[] = [
   {
     selector: '[data-tutorial="home-features"]',
     title: 'Features & persistence',
-    body: 'JSON upload, autosaved Configuration, live recalculation, and JESD79-5-aligned modeling are summarized here. The header links reach Inverse Design, Deployment Planning, Configuration, Core Power, and DIMM Power anytime.',
+    body: 'Memspec JSON import, autosaved Configuration, live recalculation, and JESD79-5-aligned modeling are summarized here. The header links reach Inverse Design, Deployment Planning, Configuration, Core Power, and DIMM Power anytime.',
     placement: 'top',
   },
 ];
@@ -48,14 +48,14 @@ export const CONFIGURATION_TUTORIAL_STEPS: SpotlightStep[] = [
   },
   {
     selector: '[data-tutorial="configuration-tabs"]',
-    title: 'Preset or build',
-    body: 'Preset loads catalog parts and workloads with quick selectors. Build your own opens the visual DIMM layout; applying writes a custom memspec back into Preset mode so you can still use uploads and the parameter panel.',
+    title: 'Choose one path',
+    body: 'Use In-app editor for presets, sliders, and visual DIMM building, or switch to Upload JSON for file-driven memspec/workload input. Only one path is shown at a time to avoid conflicting controls on the same screen.',
     placement: 'bottom',
   },
   {
     selector: '[data-tutorial="configuration-presets"]',
     title: 'Memory & workload presets',
-    body: 'Choose manufacturer, device, speed bin, and a workload profile. These set the baseline architecture and activity factors before you open the detailed editors. Custom JSON elsewhere overrides preset selection when loaded.',
+    body: 'Choose manufacturer, device, speed bin, and a workload activity profile. These set the baseline architecture and scheduling mix before you open the detailed panel. Importing a memspec JSON marks memory as custom while workload stays editable via presets and sliders.',
     placement: 'top',
   },
   {
@@ -66,8 +66,8 @@ export const CONFIGURATION_TUTORIAL_STEPS: SpotlightStep[] = [
   },
   {
     selector: '[data-tutorial="configuration-uploads"]',
-    title: 'Upload JSON',
-    body: 'Drop in a full memspec package or a standalone workload file when you already have lab or EDA exports. Successful loads switch markers to custom; errors surface in the alerts with format hints below each uploader.',
+    title: 'Upload memspec and workload JSON',
+    body: 'Upload mode accepts a memspec package compatible with core load_memspec and a workload file with all required fields from load_workload. Success and parse validation messages are shown inline for each file card.',
     placement: 'top',
   },
   {
@@ -88,7 +88,7 @@ export const TARGET_POWER_TUTORIAL_STEPS: SpotlightStep[] = [
   {
     selector: '[data-tutorial="target-power-optimization"]',
     title: 'Profile & emphasis',
-    body: 'Balanced, core-optimized, and DIMM-optimized profiles change how the solver weights mismatches. Under balanced, the slider tilts penalty toward core versus whole-module power—use it when one target matters slightly more.',
+    body: 'Optimizer profiles control how the search penalizes core die power versus whole-module (DIMM) power—not the workload activity presets from Configuration. When Equal core & module is selected, the emphasis slider tilts penalties toward die-only or module-total targets.',
     placement: 'bottom',
   },
   {

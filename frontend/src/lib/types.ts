@@ -1,4 +1,13 @@
 // DDR5 Power Calculator Type Definitions
+//
+// Core alignment (read-only reference: core/src/parser.py):
+// - MemSpec matches nested JSON from load_memspec: memoryId, memoryType, memarchitecturespec,
+//   mempowerspec, memtimingspec. API Pydantic models in api/main.py mirror the same shape.
+// - Workload matches root JSON from load_workload: BNK_PRE_percent, CKE_LO_PRE_percent,
+//   CKE_LO_ACT_percent, PageHit_percent, RDsch_percent, RD_Data_Low_percent, WRsch_percent,
+//   WR_Data_Low_percent, termRDsch_percent, termWRsch_percent, System_tRC_ns, tRRDsch_ns.
+// - MemPowerSpec IDD/IPP fields are stored in milliamps in this app; the frontend calculator
+//   converts to amps where the core model expects electrical current in SI base units.
 
 export interface MemArchitectureSpec {
   width: number;

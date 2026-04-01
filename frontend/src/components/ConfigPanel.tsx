@@ -1,13 +1,12 @@
 'use client';
 
-import { useState } from 'react';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
@@ -52,10 +51,12 @@ export function ConfigPanel({
           <Settings2 className="w-4 h-4 text-primary" />
           Configuration
         </CardTitle>
+        <CardDescription className="text-xs pt-1">
+          Fields mirror <code className="text-[10px] bg-muted px-1 rounded">core/src/parser.py</code> MemSpec and Workload. Adjust workload here or via presets—there is no separate file import for workload.
+        </CardDescription>
       </CardHeader>
       <CardContent className="!p-0 overflow-y-auto scrollbar-thin" style={{ maxHeight: 'calc(100vh - 20rem)' }}>
         <Accordion type="multiple" defaultValue={['voltage', 'workload']} className="w-full">
-          {/* Architecture Section */}
           <AccordionItem value="architecture" className="border-border">
             <AccordionTrigger className="px-4 py-3 hover:bg-secondary/50">
               <div className="flex items-center gap-2">
@@ -78,7 +79,6 @@ export function ConfigPanel({
             </AccordionContent>
           </AccordionItem>
 
-          {/* Voltage Section */}
           <AccordionItem value="voltage" className="border-border">
             <AccordionTrigger className="px-4 py-3 hover:bg-secondary/50">
               <div className="flex items-center gap-2">
@@ -87,6 +87,9 @@ export function ConfigPanel({
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-4 pb-4 space-y-5">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                All IDD and IPP inputs are <strong className="font-medium text-foreground">milliamps (mA)</strong>. The calculator converts to amps internally to match the core power model.
+              </p>
               <SliderControl
                 label="VDD (Core)"
                 value={memspec.mempowerspec.vdd}
@@ -114,9 +117,9 @@ export function ConfigPanel({
                 unit="V"
                 onChange={(v) => handlePowerChange('vddq', v)}
               />
-              
+
               <div className="pt-2 border-t border-border">
-                <p className="text-xs text-muted-foreground mb-3">Key IDD Currents (mA)</p>
+                <p className="text-xs text-muted-foreground mb-3">Key IDD currents (mA)</p>
                 <div className="grid grid-cols-2 gap-3">
                   <NumberInput
                     label="IDD0 (ACT)"
@@ -143,7 +146,6 @@ export function ConfigPanel({
             </AccordionContent>
           </AccordionItem>
 
-          {/* Workload Section */}
           <AccordionItem value="workload" className="border-border">
             <AccordionTrigger className="px-4 py-3 hover:bg-secondary/50">
               <div className="flex items-center gap-2">
@@ -152,28 +154,53 @@ export function ConfigPanel({
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-4 pb-4 space-y-5">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Scheduling and timing percentages match the Workload dataclass consumed by the core model. Use presets for quick profiles, then refine here.
+              </p>
               <SliderControl
-                label="Read Activity"
+                label="Read scheduling"
                 value={workload.RDsch_percent}
                 min={0}
                 max={50}
                 step={1}
                 unit="%"
+                hint="Share of time budgeted to read-related scheduling (not bus utilization)."
                 onChange={(v) => handleWorkloadChange('RDsch_percent', v)}
                 color="text-power-read"
               />
               <SliderControl
-                label="Write Activity"
+                label="Write scheduling"
                 value={workload.WRsch_percent}
                 min={0}
                 max={50}
                 step={1}
                 unit="%"
+                hint="Share of time budgeted to write-related scheduling."
                 onChange={(v) => handleWorkloadChange('WRsch_percent', v)}
                 color="text-power-write"
               />
               <SliderControl
-                label="Banks Precharged"
+                label="CKE low (precharged)"
+                value={workload.CKE_LO_PRE_percent}
+                min={0}
+                max={100}
+                step={1}
+                unit="%"
+                hint="Fraction of time CKE is low while banks are precharged."
+                onChange={(v) => handleWorkloadChange('CKE_LO_PRE_percent', v)}
+              />
+              <SliderControl
+                label="CKE low (active)"
+                value={workload.CKE_LO_ACT_percent}
+                min={0}
+                max={100}
+                step={1}
+                unit="%"
+                hint="Fraction of time CKE is low while rows are active."
+                onChange={(v) => handleWorkloadChange('CKE_LO_ACT_percent', v)}
+              />
+              <SliderControl
+                label="Banks precharged"
                 value={workload.BNK_PRE_percent}
                 min={0}
                 max={100}
@@ -182,7 +209,7 @@ export function ConfigPanel({
                 onChange={(v) => handleWorkloadChange('BNK_PRE_percent', v)}
               />
               <SliderControl
-                label="Page Hit Rate"
+                label="Page hit rate"
                 value={workload.PageHit_percent}
                 min={0}
                 max={100}
@@ -191,12 +218,61 @@ export function ConfigPanel({
                 onChange={(v) => handleWorkloadChange('PageHit_percent', v)}
               />
               <SliderControl
-                label="tRRD Scheduling"
+                label="Read data low"
+                value={workload.RD_Data_Low_percent}
+                min={0}
+                max={100}
+                step={1}
+                unit="%"
+                hint="Data bus low time during read-related intervals."
+                onChange={(v) => handleWorkloadChange('RD_Data_Low_percent', v)}
+              />
+              <SliderControl
+                label="Write data low"
+                value={workload.WR_Data_Low_percent}
+                min={0}
+                max={100}
+                step={1}
+                unit="%"
+                hint="Data bus low time during write-related intervals."
+                onChange={(v) => handleWorkloadChange('WR_Data_Low_percent', v)}
+              />
+              <SliderControl
+                label="Terminated read scheduling"
+                value={workload.termRDsch_percent}
+                min={0}
+                max={100}
+                step={1}
+                unit="%"
+                onChange={(v) => handleWorkloadChange('termRDsch_percent', v)}
+              />
+              <SliderControl
+                label="Terminated write scheduling"
+                value={workload.termWRsch_percent}
+                min={0}
+                max={100}
+                step={1}
+                unit="%"
+                onChange={(v) => handleWorkloadChange('termWRsch_percent', v)}
+              />
+              <SliderControl
+                label="System tRC"
+                value={workload.System_tRC_ns}
+                min={20}
+                max={150}
+                step={1}
+                unit="ns"
+                hint="Row cycle time used in workload modeling (nanoseconds)."
+                onChange={(v) => handleWorkloadChange('System_tRC_ns', v)}
+              />
+              <SliderControl
+                label="tRRD scheduling"
                 value={workload.tRRDsch_ns}
                 min={2}
                 max={20}
                 step={0.5}
                 unit="ns"
+                hint="Active-active delay scheduling component."
                 onChange={(v) => handleWorkloadChange('tRRDsch_ns', v)}
               />
             </AccordionContent>
@@ -225,17 +301,23 @@ interface SliderControlProps {
   unit: string;
   onChange: (value: number) => void;
   color?: string;
+  hint?: string;
 }
 
-function SliderControl({ label, value, min, max, step, unit, onChange, color }: SliderControlProps) {
+function formatTick(n: number, step: number): string {
+  return n.toFixed(step < 1 ? 2 : 0);
+}
+
+function SliderControl({ label, value, min, max, step, unit, onChange, color, hint }: SliderControlProps) {
   return (
     <div className="space-y-2">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center gap-2">
         <Label className="text-sm text-muted-foreground">{label}</Label>
-        <span className={`data-value ${color || ''}`}>
-          {value.toFixed(step < 1 ? 2 : 0)} {unit}
+        <span className={`data-value shrink-0 ${color || ''}`}>
+          {formatTick(value, step)} {unit}
         </span>
       </div>
+      {hint ? <p className="text-xs text-muted-foreground leading-snug">{hint}</p> : null}
       <Slider
         value={[value]}
         min={min}
@@ -244,6 +326,14 @@ function SliderControl({ label, value, min, max, step, unit, onChange, color }: 
         onValueChange={([v]) => onChange(v)}
         className="py-1"
       />
+      <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums px-0.5">
+        <span>
+          {formatTick(min, step)} {unit}
+        </span>
+        <span>
+          {formatTick(max, step)} {unit}
+        </span>
+      </div>
     </div>
   );
 }

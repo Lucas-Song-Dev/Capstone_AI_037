@@ -62,9 +62,9 @@ export default function Home() {
                 </CardHeader>
                 <CardContent className="!p-4 !pt-0 space-y-2">
                   <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                    <li>Select a memory preset or upload a custom JSON file</li>
-                    <li>Choose a workload profile or upload custom workload</li>
-                    <li>Adjust voltage, current, and workload parameters</li>
+                    <li>Select a memory preset or import a memspec JSON file</li>
+                    <li>Choose a workload activity profile, then fine-tune every workload field</li>
+                    <li>Adjust voltage, IDD/IPP currents, and scheduling percentages</li>
                   </ul>
                 </CardContent>
               </Card>
@@ -129,12 +129,12 @@ export default function Home() {
                 <CardHeader className="!p-4 !pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
                     <FileJson className="w-4 h-4 text-primary" />
-                    Custom JSON Upload
+                    Memspec JSON import
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="!p-4 !pt-0">
                   <p className="text-sm text-muted-foreground">
-                    Upload your own memory specification and workload JSON files for custom configurations.
+                    Drop in a memspec package that matches the core parser shape; workload stays in-app via presets and the Configuration panel.
                   </p>
                 </CardContent>
               </Card>

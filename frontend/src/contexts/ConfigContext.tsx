@@ -147,27 +147,33 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     try {
       const text = await file.text();
       const json = JSON.parse(text);
-      
-      // Handle both direct workload and wrapped in "workload" key
-      const workloadData = json.workload || json;
-      
-      // Validate required fields
-      const requiredFields = [
-        'BNK_PRE_percent', 'CKE_LO_PRE_percent', 'CKE_LO_ACT_percent',
-        'RDsch_percent', 'WRsch_percent', 'tRRDsch_ns'
+      const workloadData = (json.workload ?? json) as Partial<Workload>;
+      const requiredFields: (keyof Workload)[] = [
+        'BNK_PRE_percent',
+        'CKE_LO_PRE_percent',
+        'CKE_LO_ACT_percent',
+        'PageHit_percent',
+        'RDsch_percent',
+        'RD_Data_Low_percent',
+        'WRsch_percent',
+        'WR_Data_Low_percent',
+        'termRDsch_percent',
+        'termWRsch_percent',
+        'System_tRC_ns',
+        'tRRDsch_ns',
       ];
-      
       for (const field of requiredFields) {
-        if (workloadData[field] === undefined) {
-          throw new Error(`Missing required field: ${field}`);
+        if (typeof workloadData[field] !== 'number' || Number.isNaN(workloadData[field])) {
+          throw new Error(`Missing or invalid required field: ${field}`);
         }
       }
-      
       setWorkload(workloadData as Workload);
     } catch (error) {
-      throw new Error(`Failed to load workload file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to load workload file: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
-  }, []);
+  }, [setWorkload]);
 
   const loadMemspecFromFile = useCallback(async (file: File) => {
     try {

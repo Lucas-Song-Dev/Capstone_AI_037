@@ -9,6 +9,7 @@ import { MemoryStick, Zap } from 'lucide-react';
 import { memoryPresets, workloadPresets } from '@/lib/presets';
 import type { MemSpec, Workload } from '@/lib/types';
 import { calculateDataRate } from '@/lib/ddr5Calculator';
+import { cn } from '@/lib/utils';
 
 interface PresetSelectorProps {
   selectedMemoryId: string;
@@ -143,10 +144,20 @@ export function PresetSelector({
                   key={preset.id}
                   variant={isSelected ? 'default' : 'outline'}
                   size="sm"
-                  className={`text-xs ${isSelected ? 'glow-accent bg-accent hover:bg-accent/90' : ''}`}
+                  className={`h-auto min-h-9 py-2 px-2 text-left justify-start ${isSelected ? 'glow-accent bg-accent hover:bg-accent/90' : ''}`}
                   onClick={() => onSelectWorkload(preset.workload, preset.id)}
                 >
-                  {preset.name}
+                  <span className="flex flex-col items-start gap-0.5 w-full">
+                    <span className="text-xs font-medium leading-tight">{preset.name}</span>
+                    <span
+                      className={cn(
+                        'text-[10px] font-normal leading-snug line-clamp-2',
+                        isSelected ? 'text-accent-foreground/90' : 'text-muted-foreground',
+                      )}
+                    >
+                      {preset.description}
+                    </span>
+                  </span>
                 </Button>
               );
             })}
