@@ -28,4 +28,6 @@ export function isOnboardingComplete(key: string): boolean {
 export function setOnboardingComplete(key: string): void {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(key, '1');
+  // Same-tab listeners (e.g. Header lock state) need an explicit signal.
+  window.dispatchEvent(new CustomEvent('ddr5:onboarding-updated', { detail: { key } }));
 }

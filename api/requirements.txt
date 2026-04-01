@@ -5,5 +5,7 @@ uvicorn[standard]>=0.24.0
 pydantic>=2.0.0
 mangum>=0.17.0
 
-# Core package dependencies (installed separately via pip install -e ../core)
-# pandas, numpy, matplotlib are included in core package
+# Core package (core/src) — same versions as core/requirements.txt for Vercel/serverless installs
+pandas>=2.0.0
+matplotlib>=3.7.0
+numpy>=1.24.0

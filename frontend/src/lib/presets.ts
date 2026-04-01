@@ -409,8 +409,8 @@ export const defaultWorkload: Workload = {
 export const workloadPresets: { id: string; name: string; description: string; workload: Workload }[] = [
   {
     id: 'balanced',
-    name: 'Balanced',
-    description: 'Typical mixed read/write workload',
+    name: 'Balanced activity',
+    description: 'Mixed read/write scheduling preset (not Inverse Design optimizer weighting).',
     workload: defaultWorkload,
   },
   {

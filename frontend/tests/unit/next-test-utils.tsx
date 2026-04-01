@@ -26,7 +26,7 @@ function AllTheProviders({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
+      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
         <ConfigProvider>
           {children}
         </ConfigProvider>

@@ -211,6 +211,12 @@ async def health():
     return {"status": "healthy"}
 
 
+@app.get("/api/health")
+async def health_under_api_prefix():
+    """Same as /health — use this when the app is only reachable under /api/* (e.g. Vercel rewrite to Mangum)."""
+    return await health()
+
+
 @app.post("/api/calculate/core", response_model=Dict[str, float])
 async def calculate_core_power(request: PowerCalculationRequest):
     """

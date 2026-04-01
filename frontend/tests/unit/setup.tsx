@@ -17,15 +17,17 @@ vi.mock("next/navigation", () => ({
   useParams: () => ({}),
 }));
 
-// Mock Next.js Link component
+// Mock Next.js Link component (forwardRef so Radix TooltipTrigger asChild + Link works in tests)
 vi.mock("next/link", () => ({
-  default: ({ children, href, ...props }: any) => {
-    return (
-      <a href={href} {...props}>
-        {children}
-      </a>
-    );
-  },
+  default: React.forwardRef<HTMLAnchorElement, React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }>(
+    function MockLink({ children, href, ...props }, ref) {
+      return (
+        <a href={href} ref={ref} {...props}>
+          {children}
+        </a>
+      );
+    },
+  ),
 }));
 
 // Mock Next.js Image component

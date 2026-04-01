@@ -14,11 +14,14 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Cpu, Zap, Settings, MemoryStick } from 'lucide-react';
 import type { DIMMPowerResult, MemSpec } from '@/lib/types';
 import { formatPower } from '@/lib/ddr5Calculator';
+import { ChartTooltipSimple, makeSeriesTooltipContent } from '@/components/recharts/chartTooltip';
+
+const DIMMBarTooltip = makeSeriesTooltipContent({ valueDecimals: 3, unitSuffix: 'W' });
 
 interface DIMMPowerVisualizerProps {
   dimmPower: DIMMPowerResult | null;
@@ -30,34 +33,6 @@ const COLORS = {
   interface: '#22c55e',
   overhead: '#f97316',
   rcd: '#a855f7',
-};
-
-// Custom tooltip component
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    const entry = payload[0];
-    const value = typeof entry.value === 'number' ? entry.value : 0;
-    
-    return (
-      <div
-        style={{
-          backgroundColor: 'hsl(222, 47%, 14%)',
-          border: '1px solid hsl(217, 32%, 22%)',
-          borderRadius: '8px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          padding: '8px 12px',
-        }}
-      >
-        <p style={{ color: 'hsl(210, 40%, 98%)', fontWeight: 500, marginBottom: '4px', marginTop: 0 }}>
-          {label || entry.name || 'Value'}
-        </p>
-        <p style={{ color: 'hsl(210, 40%, 98%)', margin: 0 }}>
-          {value.toFixed(3)} W
-        </p>
-      </div>
-    );
-  }
-  return null;
 };
 
 export function DIMMPowerVisualizer({ dimmPower, memspec }: DIMMPowerVisualizerProps) {
@@ -133,6 +108,9 @@ export function DIMMPowerVisualizer({ dimmPower, memspec }: DIMMPowerVisualizerP
               {dimmPower.chipsPerDIMM} chips
             </Badge>
           </CardTitle>
+          <CardDescription className="text-xs relative pt-1">
+            Module total includes die (core) power, VDDQ interface, and overhead such as PMIC loss and RCD where modeled—distinct from die-only Core Power.
+          </CardDescription>
         </CardHeader>
         <CardContent className="!p-4 !pt-0 relative">
           <div className="text-center mb-4">
@@ -174,6 +152,9 @@ export function DIMMPowerVisualizer({ dimmPower, memspec }: DIMMPowerVisualizerP
           <CardTitle className="text-sm font-medium text-muted-foreground">
             DIMM Power Breakdown (W)
           </CardTitle>
+          <CardDescription className="text-xs pt-1">
+            Same categories as the summary tiles above; values are watts so they align with the headline module total.
+          </CardDescription>
         </CardHeader>
         <CardContent className="!p-4 !pt-0">
           <ResponsiveContainer width="100%" height={200}>
@@ -190,7 +171,7 @@ export function DIMMPowerVisualizer({ dimmPower, memspec }: DIMMPowerVisualizerP
                 axisLine={{ stroke: 'hsl(217, 32%, 22%)' }}
                 tickLine={{ stroke: 'hsl(217, 32%, 22%)' }}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={DIMMBarTooltip} />
               <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={60}>
                 {breakdownData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -224,32 +205,18 @@ export function DIMMPowerVisualizer({ dimmPower, memspec }: DIMMPowerVisualizerP
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip 
+              <Tooltip
                 content={(props) => {
-                  if (props.active && props.payload && props.payload.length) {
-                    const entry = props.payload[0];
-                    const value = typeof entry.value === 'number' ? entry.value : 0;
-                    const total = pieData.reduce((sum, d) => sum + d.value, 0);
-                    return (
-                      <div
-                        style={{
-                          backgroundColor: 'hsl(222, 47%, 14%)',
-                          border: '1px solid hsl(217, 32%, 22%)',
-                          borderRadius: '8px',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                          padding: '8px 12px',
-                        }}
-                      >
-                        <p style={{ color: 'hsl(210, 40%, 98%)', fontWeight: 500, marginBottom: '4px', marginTop: 0 }}>
-                          {entry.name || 'Value'}
-                        </p>
-                        <p style={{ color: 'hsl(210, 40%, 98%)', margin: 0 }}>
-                          {`${value.toFixed(3)} W (${((value / total) * 100).toFixed(1)}%)`}
-                        </p>
-                      </div>
-                    );
-                  }
-                  return null;
+                  if (!props.active || !props.payload?.length) return null;
+                  const entry = props.payload[0];
+                  const value = typeof entry.value === 'number' ? entry.value : 0;
+                  const total = pieData.reduce((sum, d) => sum + d.value, 0);
+                  return (
+                    <ChartTooltipSimple
+                      title={entry.name || 'Value'}
+                      valueText={`${value.toFixed(3)} W (${((value / total) * 100).toFixed(1)}%)`}
+                    />
+                  );
                 }}
               />
               <Legend 

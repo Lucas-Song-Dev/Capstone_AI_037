@@ -14,12 +14,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { HelpCircle } from "lucide-react";
+import { HelpTooltip } from "@/components/HelpTooltip";
 import { useConfig } from "@/contexts/ConfigContext";
 import type { PowerResult, DIMMPowerResult } from "@/lib/types";
 import { inverseSearchForTarget } from "@/lib/inverseDDR5";
@@ -131,26 +126,15 @@ export default function TargetPower() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <label className="block text-xs font-medium text-muted-foreground">
-                      Optimization Profile
+                      Optimizer profile
                     </label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button type="button" className="inline-flex items-center">
-                          <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs p-3 bg-popover border border-border shadow-lg">
-                        <p className="text-sm">
-                          <strong>What should we focus on when searching?</strong><br />
-                          This tells the tool what&apos;s most important to you. &quot;Balanced&quot; means 
-                          we care about both the chip power (Core) and the whole memory stick 
-                          power (DIMM) equally. &quot;Core-Optimized&quot; means we really want the chip 
-                          power to be perfect. &quot;DIMM-Optimized&quot; means we care most about the 
-                          total memory stick power. Like choosing what&apos;s most important when 
-                          picking a car - speed, comfort, or both!
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
+                    <HelpTooltip label="Help: optimizer profile">
+                      <p className="text-sm">
+                        Controls how the search penalizes <strong>die (core)</strong> power versus{" "}
+                        <strong>whole-module</strong> power (core plus interface and overhead modeled for the DIMM).
+                        This is separate from workload activity presets on Configuration.
+                      </p>
+                    </HelpTooltip>
                   </div>
                   <Select
                     value={profile}
@@ -162,39 +146,31 @@ export default function TargetPower() {
                       <SelectValue placeholder="Select profile" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="balanced">Balanced (Core + DIMM)</SelectItem>
-                      <SelectItem value="core">Core-Optimized</SelectItem>
-                      <SelectItem value="dimm">DIMM-Optimized</SelectItem>
+                      <SelectItem value="balanced">Equal weight: core vs module total</SelectItem>
+                      <SelectItem value="core">Prioritize die (core) match</SelectItem>
+                      <SelectItem value="dimm">Prioritize module total (DIMM) match</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <span>Core vs DIMM Emphasis</span>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button type="button" className="inline-flex items-center">
-                            <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs p-3 bg-popover border border-border shadow-lg">
-                          <p className="text-sm">
-                            <strong>How much should we care about each part?</strong><br />
-                            When you pick &quot;Balanced&quot; profile, this slider lets you fine-tune 
-                            the balance. Core is the power used by the memory chip itself. 
-                            DIMM is the power used by the whole memory stick (chip + extra parts). 
-                            Moving the slider is like adjusting a seesaw - more to one side means 
-                            we care more about that part being perfect!
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
+                  <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium text-foreground/90">Target emphasis</span>
+                      <HelpTooltip label="Help: target emphasis" triggerClassName="shrink-0">
+                        <p className="text-sm">
+                          Only active for <strong>Equal weight</strong>. Tilts the loss toward matching die power
+                          or full module power when both targets are in play.
+                        </p>
+                      </HelpTooltip>
                     </div>
-                    <span>
-                      Core {(100 - dimmWeight).toFixed(0)}% / DIMM{" "}
-                      {dimmWeight.toFixed(0)}%
+                    <span className="shrink-0 tabular-nums">
+                      Die {(100 - dimmWeight).toFixed(0)}% / Module {dimmWeight.toFixed(0)}%
                     </span>
+                  </div>
+                  <div className="flex justify-between text-[10px] text-muted-foreground uppercase tracking-wide max-w-xs px-0.5">
+                    <span>Die (core)</span>
+                    <span>Module total (DIMM)</span>
                   </div>
                   <Slider
                     value={[dimmWeight]}
@@ -205,6 +181,11 @@ export default function TargetPower() {
                     onValueChange={([val]) => setDimmWeight(val)}
                     disabled={profile !== "balanced"}
                   />
+                  {profile !== "balanced" ? (
+                    <p className="text-xs text-muted-foreground max-w-xs">
+                      Emphasis is fixed while a one-sided optimizer profile is selected; choose Equal weight to adjust the split.
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
@@ -214,22 +195,15 @@ export default function TargetPower() {
                   <label className="block text-sm mb-1">
                     Target Total Core Power (W)
                   </label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button type="button" className="inline-flex items-center">
-                        <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs p-3 bg-popover border border-border shadow-lg">
-                      <p className="text-sm">
-                        <strong>What power do you want the memory chip to use?</strong><br />
-                        This is the power (in Watts) that you want one memory chip to use. 
-                        The tool will search for memory that matches this power as closely 
-                        as possible.                         Think of it like telling a chef &quot;I want a meal that 
-                        has exactly 500 calories&quot; - they&apos;ll find the best recipe that matches!
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
+                  <HelpTooltip label="Help: target core power">
+                    <p className="text-sm">
+                      <strong>What power do you want the memory chip to use?</strong><br />
+                      This is the power (in Watts) that you want one memory chip to use. 
+                      The tool will search for memory that matches this power as closely 
+                      as possible.                         Think of it like telling a chef &quot;I want a meal that 
+                      has exactly 500 calories&quot; - they&apos;ll find the best recipe that matches!
+                    </p>
+                  </HelpTooltip>
                 </div>
                 <Input
                   type="number"
@@ -245,23 +219,16 @@ export default function TargetPower() {
                   <label className="block text-sm mb-1">
                     Target Total DIMM Power (W, optional)
                   </label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button type="button" className="inline-flex items-center">
-                        <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs p-3 bg-popover border border-border shadow-lg">
-                      <p className="text-sm">
-                        <strong>What power do you want the whole memory stick to use?</strong><br />
-                        This is optional! If you leave it empty, we&apos;ll only match the chip power. 
-                        But if you fill it in, we&apos;ll try to match both the chip power AND the 
-                        whole memory stick power. The DIMM power includes the chip plus extra 
-                        parts like connectors. It&apos;s like saying &quot;I want the engine to use 100W 
-                        AND the whole car to use 150W&quot; - more specific!
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
+                  <HelpTooltip label="Help: target DIMM power">
+                    <p className="text-sm">
+                      <strong>What power do you want the whole memory stick to use?</strong><br />
+                      This is optional! If you leave it empty, we&apos;ll only match the chip power. 
+                      But if you fill it in, we&apos;ll try to match both the chip power AND the 
+                      whole memory stick power. The DIMM power includes the chip plus extra 
+                      parts like connectors. It&apos;s like saying &quot;I want the engine to use 100W 
+                      AND the whole car to use 150W&quot; - more specific!
+                    </p>
+                  </HelpTooltip>
                 </div>
                 <Input
                   type="number"
