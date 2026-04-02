@@ -14,7 +14,8 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DescriptionWithTooltip } from '@/components/DescriptionTooltip';
 import type { PowerResult } from '@/lib/types';
 import { formatPower } from '@/lib/ddr5Calculator';
 import { ChartTooltipSimple, makeSeriesTooltipContent } from '@/components/recharts/chartTooltip';
@@ -67,9 +68,12 @@ export function PowerBreakdownChart({ powerResult }: PowerChartProps) {
     <Card className="power-card">
       <CardHeader className="!p-4 !pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">Power Breakdown (mW)</CardTitle>
-        <CardDescription className="text-xs pt-1">
-          Per-component bars are in milliwatts (core contributions × 1000). Summary totals on this page use watts from the same modeled values—divide the bar stack by 1000 to compare to headline W.
-        </CardDescription>
+        <DescriptionWithTooltip
+          variant="card"
+          className="text-xs pt-1"
+          label="About this chart"
+          text="Per-component bars are in milliwatts (core contributions × 1000). Summary totals on this page use watts from the same modeled values—divide the bar stack by 1000 to compare to headline W."
+        />
       </CardHeader>
       <CardContent className="!p-4 !pt-0">
         <ResponsiveContainer width="100%" height={220}>
@@ -133,9 +137,12 @@ export function PowerDistributionChart({ powerResult }: PowerChartProps) {
     <Card className="power-card">
       <CardHeader className="!p-4 !pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">VDD vs VPP Distribution</CardTitle>
-        <CardDescription className="text-xs pt-1">
-          Slice values are milliwatts of core power on each rail. VDD + VPP in mW correspond to the watt-scale VDD/VPP lines in the total summary (same physics, different unit for chart readability).
-        </CardDescription>
+        <DescriptionWithTooltip
+          variant="card"
+          className="text-xs pt-1"
+          label="About this chart"
+          text="Slice values are milliwatts of core power on each rail. VDD + VPP in mW correspond to the watt-scale VDD/VPP lines in the total summary (same physics, different unit for chart readability)."
+        />
       </CardHeader>
       <CardContent className="!p-4 !pt-0">
         <ResponsiveContainer width="100%" height={220}>

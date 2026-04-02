@@ -13,6 +13,10 @@ import { ArrowLeft } from 'lucide-react';
 import { SpotlightTutorial } from '@/components/SpotlightTutorial';
 import { CORE_POWER_TUTORIAL_STEPS } from '@/config/spotlight-page-steps';
 import { ONBOARDING_CORE_POWER_KEY } from '@/lib/onboarding-storage';
+import { DescriptionWithTooltip } from '@/components/DescriptionTooltip';
+
+const CORE_POWER_PAGE_INTRO =
+  'Core power is modeled per DRAM die using JEDEC-style IDD/IPP and your workload schedule. Charts on this page show the same totals in milliwatts for readability while headline numbers stay in watts. The 3D view reflects geometry from your current memspec.';
 
 export default function CorePower() {
   const { memspec, workload } = useConfig();
@@ -29,9 +33,7 @@ export default function CorePower() {
         <div className="mb-6 flex items-center justify-between gap-4">
           <div data-tutorial="core-power-intro">
             <h1 className="text-3xl font-bold mb-2">Core Power Analysis</h1>
-            <p className="text-muted-foreground">
-              Detailed breakdown of DDR5 core power consumption per chip
-            </p>
+            <DescriptionWithTooltip variant="plain" label="About core power" text={CORE_POWER_PAGE_INTRO} />
           </div>
           <Button
             data-tutorial="core-power-back"

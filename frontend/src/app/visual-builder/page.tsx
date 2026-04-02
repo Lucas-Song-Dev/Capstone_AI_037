@@ -2,7 +2,11 @@
 
 import { Header } from '@/components/Header';
 import { VisualBuilderContent } from '@/components/VisualBuilderContent';
+import { DescriptionWithTooltip } from '@/components/DescriptionTooltip';
 import { Box } from 'lucide-react';
+
+const VISUAL_BUILDER_INTRO =
+  'Configure one DDR5 DIMM: set Banks, Bank groups, Ranks, Width, Burst length, Columns, and devices. The board shows your single DIMM (position doesn’t matter). Core and DIMM power update live.';
 
 export default function VisualBuilderPage() {
   return (
@@ -14,9 +18,7 @@ export default function VisualBuilderPage() {
             <Box className="w-6 h-6 text-primary" />
             Visual DIMM Builder
           </h1>
-          <p className="text-muted-foreground text-sm">
-            Configure one DDR5 DIMM: set Banks, Bank groups, Ranks, Width, Burst length, Columns, and devices. The board shows your single DIMM (position doesn’t matter). Core and DIMM power update live.
-          </p>
+          <DescriptionWithTooltip variant="plain" label="About the builder" text={VISUAL_BUILDER_INTRO} />
         </div>
         <VisualBuilderContent />
       </main>

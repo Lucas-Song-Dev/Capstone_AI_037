@@ -18,6 +18,10 @@ import { useRouter } from 'next/navigation';
 import { SpotlightTutorial } from '@/components/SpotlightTutorial';
 import { CONFIGURATION_TUTORIAL_STEPS } from '@/config/spotlight-page-steps';
 import { ONBOARDING_CONFIGURATION_KEY } from '@/lib/onboarding-storage';
+import { DescriptionWithTooltip } from '@/components/DescriptionTooltip';
+
+const CONFIGURATION_PAGE_INTRO =
+  'Configure memory specifications and workload parameters. Choose one path at a time: either the in-app editor or JSON upload. The in-app path uses presets, sliders, and the visual builder; upload mode accepts memspec and workload JSON files.';
 
 export default function Configuration() {
   const { memspec, workload, setMemspec, setWorkload, loadMemspecFromFile, loadWorkloadFromFile } = useConfig();
@@ -139,9 +143,7 @@ export default function Configuration() {
         <div className="max-w-6xl mx-auto">
           <div className="mb-6" data-tutorial="configuration-intro">
             <h1 className="text-3xl font-bold mb-2">Configuration</h1>
-            <p className="text-muted-foreground">
-              Configure memory specifications and workload parameters. Choose one path at a time: use in-app presets/sliders and builder, or upload JSON files for both memspec and workload.
-            </p>
+            <DescriptionWithTooltip variant="plain" label="Configuration overview" text={CONFIGURATION_PAGE_INTRO} />
           </div>
 
           <Tabs value={configMode} onValueChange={(v) => setConfigMode(v as 'inApp' | 'upload')} className="w-full">

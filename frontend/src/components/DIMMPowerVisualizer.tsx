@@ -14,7 +14,8 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DescriptionWithTooltip } from '@/components/DescriptionTooltip';
 import { Badge } from '@/components/ui/badge';
 import { Cpu, Zap, Settings, MemoryStick } from 'lucide-react';
 import type { DIMMPowerResult, MemSpec } from '@/lib/types';
@@ -108,9 +109,12 @@ export function DIMMPowerVisualizer({ dimmPower, memspec }: DIMMPowerVisualizerP
               {dimmPower.chipsPerDIMM} chips
             </Badge>
           </CardTitle>
-          <CardDescription className="text-xs relative pt-1">
-            Module total includes die (core) power, VDDQ interface, and overhead such as PMIC loss and RCD where modeled—distinct from die-only Core Power.
-          </CardDescription>
+          <DescriptionWithTooltip
+            variant="card"
+            className="text-xs relative pt-1"
+            label="About module total"
+            text="Module total includes die (core) power, VDDQ interface, and overhead such as PMIC loss and RCD where modeled—distinct from die-only Core Power."
+          />
         </CardHeader>
         <CardContent className="!p-4 !pt-0 relative">
           <div className="text-center mb-4">
@@ -152,9 +156,12 @@ export function DIMMPowerVisualizer({ dimmPower, memspec }: DIMMPowerVisualizerP
           <CardTitle className="text-sm font-medium text-muted-foreground">
             DIMM Power Breakdown (W)
           </CardTitle>
-          <CardDescription className="text-xs pt-1">
-            Same categories as the summary tiles above; values are watts so they align with the headline module total.
-          </CardDescription>
+          <DescriptionWithTooltip
+            variant="card"
+            className="text-xs pt-1"
+            label="About this chart"
+            text="Same categories as the summary tiles above; values are watts so they align with the headline module total."
+          />
         </CardHeader>
         <CardContent className="!p-4 !pt-0">
           <ResponsiveContainer width="100%" height={200}>
