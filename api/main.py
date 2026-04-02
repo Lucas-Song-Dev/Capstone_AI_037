@@ -7,7 +7,7 @@ from the Next.js frontend deployed on Vercel.
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Dict, Optional, List
 import sys
 import os
@@ -55,6 +55,25 @@ class MemArchitectureSpecModel(BaseModel):
     burstLength: int
     dataRate: int
 
+    # JSON may send floats (e.g. from JS math); core/parser use int counts.
+    @field_validator(
+        "width",
+        "nbrOfBanks",
+        "nbrOfBankGroups",
+        "nbrOfRanks",
+        "nbrOfColumns",
+        "nbrOfRows",
+        "nbrOfDevices",
+        "burstLength",
+        "dataRate",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_arch_ints(cls, v):
+        if isinstance(v, float):
+            return int(round(v))
+        return v
+
 
 class MemPowerSpecModel(BaseModel):
     vdd: float
@@ -90,6 +109,22 @@ class MemTimingSpecModel(BaseModel):
     RFCsb: int
     REFI: int
 
+    @field_validator(
+        "RAS",
+        "RCD",
+        "RP",
+        "RFC1",
+        "RFC2",
+        "RFCsb",
+        "REFI",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_timing_cycles(cls, v):
+        if isinstance(v, float):
+            return int(round(v))
+        return v
+
 
 class MemSpecModel(BaseModel):
     memoryId: str
@@ -117,6 +152,16 @@ class WorkloadModel(BaseModel):
 class PowerCalculationRequest(BaseModel):
     memspec: MemSpecModel
     workload: WorkloadModel
+
+
+class BatchDimmPowerRequest(BaseModel):
+    """Many memspecs, one workload — used by inverse search and preset scans."""
+
+    workload: WorkloadModel
+    memspecs: List[MemSpecModel]
+
+
+MAX_DIMM_BATCH = 512
 
 
 def memspec_model_to_obj(memspec_model: MemSpecModel) -> MemSpec:
@@ -301,6 +346,38 @@ async def calculate_dimm_power(request: PowerCalculationRequest):
         )
         result = dimm.compute_all()
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/calculate/dimm/batch")
+async def calculate_dimm_power_batch(request: BatchDimmPowerRequest):
+    """
+    DIMM-level power for many memspecs with the same workload (Python core, in-process).
+    Response order matches request memspec order.
+    """
+    if len(request.memspecs) == 0:
+        return {"results": []}
+    if len(request.memspecs) > MAX_DIMM_BATCH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"At most {MAX_DIMM_BATCH} memspecs per batch",
+        )
+    try:
+        workload = workload_model_to_obj(request.workload)
+        core_model = DDR5CorePowerModel()
+        interface_model = DDR5InterfacePowerModel()
+        results: List[Dict[str, float]] = []
+        for m_model in request.memspecs:
+            memspec = memspec_model_to_obj(m_model)
+            dimm = DIMM.from_memspec(
+                memspec,
+                workload,
+                core_model=core_model,
+                interface_model=interface_model,
+            )
+            results.append(dimm.compute_all())
+        return {"results": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

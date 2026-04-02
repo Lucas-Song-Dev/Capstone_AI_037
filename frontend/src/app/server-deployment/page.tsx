@@ -41,43 +41,43 @@ export default function ServerDeployment() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     setError(null);
     setSelectedConfig(null);
-    
+
     const powerBudgetNum = parseFloat(powerBudget);
     const minDataRateNum = parseFloat(minDataRate);
     const totalCapacityNum = parseFloat(totalCapacity);
     const maxDIMMsNum = parseInt(maxDIMMs);
-    
+
     if (!Number.isFinite(powerBudgetNum) || powerBudgetNum <= 0) {
       setError("Power budget must be a positive number");
       return;
     }
-    
+
     if (!Number.isFinite(minDataRateNum) || minDataRateNum <= 0) {
       setError("Minimum data rate must be a positive number");
       return;
     }
-    
+
     if (!Number.isFinite(totalCapacityNum) || totalCapacityNum <= 0) {
       setError("Total capacity must be a positive number");
       return;
     }
-    
+
     if (!Number.isFinite(maxDIMMsNum) || maxDIMMsNum < 1 || maxDIMMsNum > 16) {
       setError("Max DIMMs must be between 1 and 16");
       return;
     }
-    
+
     const numServersNum = parseFloat(numServers);
     if (!Number.isFinite(numServersNum) || numServersNum < 1 || numServersNum > 1000000) {
       setError("Number of servers must be between 1 and 1,000,000");
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
       const requirements: ServerRequirements = {
         powerBudgetPerServer: powerBudgetNum,
@@ -86,17 +86,17 @@ export default function ServerDeployment() {
         workloadType,
         dimmsPerServer: maxDIMMsNum,
       };
-      
-      const results = findServerConfigurations(requirements);
-      
+
+      const results = await findServerConfigurations(requirements);
+
       if (results.length === 0) {
         setError("No configurations found that meet all requirements. Try relaxing constraints.");
       } else {
         setConfigurations(results);
-        setSelectedConfig(results[0]); // Select best match
+        setSelectedConfig(results[0]);
       }
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to find configurations");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to find configurations");
     } finally {
       setLoading(false);
     }

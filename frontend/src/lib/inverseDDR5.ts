@@ -1,6 +1,7 @@
 import type { MemSpec, MemPowerSpec, Workload, PowerResult, MemoryPreset, DIMMPowerResult } from "./types";
 import { computeCorePower, computeDIMMPower } from "./ddr5Calculator";
 import { memoryPresets } from "./presets";
+import { isApiAvailable, fetchBatchDIMMPower } from "./api";
 
 export interface InverseTarget {
   P_total_core: number;
@@ -174,6 +175,89 @@ function isPhysicallyReasonable(power: PowerResult): boolean {
   );
 }
 
+function updateBestForCandidate(
+  preset: MemoryPreset,
+  candidateMemspec: MemSpec,
+  power: PowerResult,
+  dimmPower: DIMMPowerResult,
+  target: InverseTarget,
+  weights: InverseWeights,
+  bestSoFar: InverseResult | null
+): InverseResult | null {
+  if (!isPhysicallyReasonable(power)) {
+    return bestSoFar;
+  }
+  const loss = computeLoss(power, dimmPower, target, weights);
+  if (!bestSoFar || loss < bestSoFar.loss) {
+    return {
+      basePresetId: preset.id,
+      basePresetName: preset.name,
+      optimizedMemspec: candidateMemspec,
+      power,
+      dimmPower,
+      loss,
+    };
+  }
+  return bestSoFar;
+}
+
+/**
+ * When NEXT_PUBLIC_API_URL is set, uses POST /api/calculate/dimm/batch (Python core).
+ * Otherwise uses the in-browser port (ddr5Calculator).
+ */
+async function searchOnePreset(
+  preset: MemoryPreset,
+  workload: Workload,
+  target: InverseTarget,
+  weights: InverseWeights,
+  samplesPerPreset: number,
+  rng: () => number
+): Promise<InverseResult | null> {
+  const candidates: MemSpec[] = [];
+  for (let i = 0; i < samplesPerPreset; i++) {
+    candidates.push(perturbMemspec(preset.memspec, rng));
+  }
+
+  let bestForPreset: InverseResult | null = null;
+
+  if (isApiAvailable()) {
+    try {
+      const dimmResults = await fetchBatchDIMMPower(workload, candidates);
+      for (let i = 0; i < candidates.length; i++) {
+        const dimmPower = dimmResults[i];
+        bestForPreset = updateBestForCandidate(
+          preset,
+          candidates[i],
+          dimmPower.corePower,
+          dimmPower,
+          target,
+          weights,
+          bestForPreset
+        );
+      }
+      return bestForPreset;
+    } catch {
+      // Network / API errors: fall back to local calculator for this preset.
+    }
+  }
+
+  for (let i = 0; i < candidates.length; i++) {
+    const m = candidates[i];
+    const power = computeCorePower(m, workload);
+    const dimmPower = computeDIMMPower(power, m);
+    bestForPreset = updateBestForCandidate(
+      preset,
+      m,
+      power,
+      dimmPower,
+      target,
+      weights,
+      bestForPreset
+    );
+  }
+  return bestForPreset;
+}
+
 export async function inverseSearchForTarget(
   workload: Workload,
   target: InverseTarget,
@@ -201,30 +285,14 @@ export async function inverseSearchForTarget(
   const presets: MemoryPreset[] = memoryPresets;
 
   for (const preset of presets) {
-    let bestForPreset: InverseResult | null = null;
-
-    for (let i = 0; i < samplesPerPreset; i++) {
-      const candidateMemspec = perturbMemspec(preset.memspec, rng);
-      const power = computeCorePower(candidateMemspec, workload);
-      const dimmPower = computeDIMMPower(power, candidateMemspec);
-
-      if (!isPhysicallyReasonable(power)) {
-        continue;
-      }
-
-      const loss = computeLoss(power, dimmPower, target, weights);
-
-      if (!bestForPreset || loss < bestForPreset.loss) {
-        bestForPreset = {
-          basePresetId: preset.id,
-          basePresetName: preset.name,
-          optimizedMemspec: candidateMemspec,
-          power,
-          dimmPower,
-          loss,
-        };
-      }
-    }
+    const bestForPreset = await searchOnePreset(
+      preset,
+      workload,
+      target,
+      weights,
+      samplesPerPreset,
+      rng
+    );
 
     if (bestForPreset) {
       if (!bestOverall || bestForPreset.loss < bestOverall.loss) {

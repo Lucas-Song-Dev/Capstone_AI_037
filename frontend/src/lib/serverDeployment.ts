@@ -1,6 +1,7 @@
-import type { MemSpec, Workload, MemoryPreset, PowerResult, DIMMPowerResult } from './types';
+import type { Workload, MemoryPreset, PowerResult, DIMMPowerResult } from './types';
 import { memoryPresets, workloadPresets } from './presets';
 import { computeCorePower, computeDIMMPower, calculateDataRate } from './ddr5Calculator';
+import { isApiAvailable, fetchBatchDIMMPower } from './api';
 
 export interface ServerRequirements {
   powerBudgetPerServer: number; // W
@@ -54,17 +55,15 @@ function getWorkload(workloadType: ServerRequirements['workloadType']): Workload
   return preset?.workload || workloadPresets[0].workload;
 }
 
-function calculateServerConfig(
+function buildServerConfiguration(
   preset: MemoryPreset,
   requirements: ServerRequirements,
-  dimmsPerServer: number
+  dimmsPerServer: number,
+  workload: Workload,
+  powerResult: PowerResult,
+  dimmPowerResult: DIMMPowerResult
 ): ServerConfiguration | null {
-  const workload = getWorkload(requirements.workloadType);
   const dimmCapacityGB = parseFloat(preset.capacity);
-  
-  // Calculate power
-  const powerResult = computeCorePower(preset.memspec, workload);
-  const dimmPowerResult = computeDIMMPower(powerResult, preset.memspec);
   
   // Calculate total server power
   const powerPerServer = dimmPowerResult.P_total_DIMM * dimmsPerServer;
@@ -114,28 +113,72 @@ function calculateServerConfig(
   };
 }
 
-export function findServerConfigurations(requirements: ServerRequirements): ServerConfiguration[] {
-  const configurations: ServerConfiguration[] = [];
-  const maxDIMMs = requirements.dimmsPerServer || 8; // Default to 8 DIMM slots
-  
+async function powerForAllPresets(
+  workload: Workload
+): Promise<Map<string, { powerResult: PowerResult; dimmPowerResult: DIMMPowerResult }>> {
+  const map = new Map<string, { powerResult: PowerResult; dimmPowerResult: DIMMPowerResult }>();
+
+  if (isApiAvailable()) {
+    try {
+      const memspecs = memoryPresets.map((p) => p.memspec);
+      const dimmResults = await fetchBatchDIMMPower(workload, memspecs);
+      memoryPresets.forEach((preset, i) => {
+        const dimmPowerResult = dimmResults[i];
+        map.set(preset.id, {
+          powerResult: dimmPowerResult.corePower,
+          dimmPowerResult,
+        });
+      });
+      return map;
+    } catch {
+      // Fall back to local calculator below.
+    }
+  }
+
   for (const preset of memoryPresets) {
-    const dimmCapacityGB = parseFloat(preset.capacity);
-    
-    // Try different DIMM counts (1 to maxDIMMs)
+    const powerResult = computeCorePower(preset.memspec, workload);
+    const dimmPowerResult = computeDIMMPower(powerResult, preset.memspec);
+    map.set(preset.id, { powerResult, dimmPowerResult });
+  }
+  return map;
+}
+
+/** Uses Python core via batch API when NEXT_PUBLIC_API_URL is set; otherwise the JS port. */
+export async function findServerConfigurations(
+  requirements: ServerRequirements
+): Promise<ServerConfiguration[]> {
+  const configurations: ServerConfiguration[] = [];
+  const maxDIMMs = requirements.dimmsPerServer || 8;
+  const workload = getWorkload(requirements.workloadType);
+  const powerByPreset = await powerForAllPresets(workload);
+
+  for (const preset of memoryPresets) {
+    const entry = powerByPreset.get(preset.id);
+    if (!entry) continue;
+    const { powerResult, dimmPowerResult } = entry;
+
     for (let dimms = 1; dimms <= maxDIMMs; dimms++) {
-      const config = calculateServerConfig(preset, requirements, dimms);
-      
-      if (config && config.meetsRequirements.power && 
-          config.meetsRequirements.performance && 
-          config.meetsRequirements.capacity) {
+      const config = buildServerConfiguration(
+        preset,
+        requirements,
+        dimms,
+        workload,
+        powerResult,
+        dimmPowerResult
+      );
+
+      if (
+        config &&
+        config.meetsRequirements.power &&
+        config.meetsRequirements.performance &&
+        config.meetsRequirements.capacity
+      ) {
         configurations.push(config);
       }
     }
   }
-  
-  // Sort by score (best first)
+
   configurations.sort((a, b) => b.score - a.score);
-  
   return configurations;
 }
 

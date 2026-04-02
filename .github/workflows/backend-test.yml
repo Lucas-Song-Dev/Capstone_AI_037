@@ -2,13 +2,13 @@ name: API Tests
 
 on:
   push:
-    branches: [ main, master, fullstack ]
+    branches: [ main, master, fullstack, fullstack-ui-3js ]
     paths:
       - 'api/**'
       - 'core/**'
       - '.github/workflows/backend-test.yml'
   pull_request:
-    branches: [ main, master, fullstack ]
+    branches: [ main, master, fullstack, fullstack-ui-3js ]
     paths:
       - 'api/**'
       - 'core/**'

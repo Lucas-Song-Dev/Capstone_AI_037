@@ -246,11 +246,14 @@ export function DIMMPowerVisualizer({ dimmPower, memspec }: DIMMPowerVisualizerP
                 {formatPower(dimmPower.P_core_DIMM, 3)}
               </span>
             </div>
-            <div className="relative h-1.5 bg-secondary rounded-full overflow-hidden">
-              <div 
-                className="absolute inset-y-0 left-0 rounded-full"
-                style={{ 
-                  width: `${corePercent}%`,
+            <div
+              className="relative h-px w-full overflow-hidden rounded-full bg-border/45"
+              aria-hidden
+            >
+              <div
+                className="absolute left-0 top-0 h-full min-h-px max-w-full rounded-full"
+                style={{
+                  width: `${Math.min(Math.max(0, parseFloat(corePercent) || 0), 100)}%`,
                   backgroundColor: COLORS.core,
                 }}
               />
@@ -267,11 +270,14 @@ export function DIMMPowerVisualizer({ dimmPower, memspec }: DIMMPowerVisualizerP
                 {formatPower(dimmPower.P_interface_DIMM, 3)}
               </span>
             </div>
-            <div className="relative h-1.5 bg-secondary rounded-full overflow-hidden">
-              <div 
-                className="absolute inset-y-0 left-0 rounded-full"
-                style={{ 
-                  width: `${interfacePercent}%`,
+            <div
+              className="relative h-px w-full overflow-hidden rounded-full bg-border/45"
+              aria-hidden
+            >
+              <div
+                className="absolute left-0 top-0 h-full min-h-px max-w-full rounded-full"
+                style={{
+                  width: `${Math.min(Math.max(0, parseFloat(interfacePercent) || 0), 100)}%`,
                   backgroundColor: COLORS.interface,
                 }}
               />
@@ -288,11 +294,14 @@ export function DIMMPowerVisualizer({ dimmPower, memspec }: DIMMPowerVisualizerP
                 {formatPower(dimmPower.P_overhead_DIMM, 3)}
               </span>
             </div>
-            <div className="relative h-1.5 bg-secondary rounded-full overflow-hidden">
-              <div 
-                className="absolute inset-y-0 left-0 rounded-full"
-                style={{ 
-                  width: `${overheadPercent}%`,
+            <div
+              className="relative h-px w-full overflow-hidden rounded-full bg-border/45"
+              aria-hidden
+            >
+              <div
+                className="absolute left-0 top-0 h-full min-h-px max-w-full rounded-full"
+                style={{
+                  width: `${Math.min(Math.max(0, parseFloat(overheadPercent) || 0), 100)}%`,
                   backgroundColor: COLORS.overhead,
                 }}
               />

@@ -2,12 +2,12 @@ name: Core Package Tests
 
 on:
   push:
-    branches: [ main, master, fullstack ]
+    branches: [ main, master, fullstack, fullstack-ui-3js ]
     paths:
       - 'core/**'
       - '.github/workflows/core-test.yml'
   pull_request:
-    branches: [ main, master, fullstack ]
+    branches: [ main, master, fullstack, fullstack-ui-3js ]
     paths:
       - 'core/**'
   workflow_dispatch:

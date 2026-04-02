@@ -28,10 +28,14 @@ class TestAPIIntegration:
         """Test API health endpoints."""
         response = client.get("/")
         assert response.status_code == 200
-        
+
         response = client.get("/health")
         assert response.status_code == 200
         assert response.json()["status"] == "healthy"
+
+        r2 = client.get("/api/health")
+        assert r2.status_code == 200
+        assert r2.json()["status"] == "healthy"
     
     def test_all_endpoints_exist(self, client):
         """Test that all API endpoints are accessible."""
@@ -85,11 +89,93 @@ class TestAPIIntegration:
             "/api/calculate/core",
             "/api/calculate/interface",
             "/api/calculate/all",
-            "/api/calculate/dimm"
+            "/api/calculate/dimm",
         ]
-        
+
         for endpoint in endpoints:
             response = client.post(endpoint, json=minimal_request)
             assert response.status_code == 200, f"Endpoint {endpoint} failed"
             assert response.json() is not None
+
+    def test_dimm_batch_endpoint_matches_single_dimm_totals(self, client):
+        """Batch route used by inverse search; totals should match single /dimm for same memspec."""
+        minimal_request = {
+            "memspec": {
+                "memoryId": "test",
+                "memoryType": "DDR5",
+                "memarchitecturespec": {
+                    "width": 8,
+                    "nbrOfBanks": 16,
+                    "nbrOfBankGroups": 8,
+                    "nbrOfRanks": 1,
+                    "nbrOfColumns": 1024,
+                    "nbrOfRows": 65536,
+                    "nbrOfDevices": 1,
+                    "burstLength": 16,
+                    "dataRate": 2,
+                },
+                "mempowerspec": {
+                    "vdd": 1.1,
+                    "vpp": 1.8,
+                    "vddq": 1.1,
+                    "idd0": 50.0,
+                    "idd2n": 46.0,
+                    "idd3n": 105.0,
+                    "idd4r": 210.0,
+                    "idd4w": 245.0,
+                    "idd5b": 10500.0,
+                    "idd6n": 46.0,
+                    "idd2p": 43.0,
+                    "idd3p": 102.0,
+                    "ipp0": 5.0,
+                    "ipp2n": 4.5,
+                    "ipp3n": 10.0,
+                    "ipp4r": 20.0,
+                    "ipp4w": 25.0,
+                    "ipp5b": 1000.0,
+                    "ipp6n": 4.5,
+                    "ipp2p": 4.0,
+                    "ipp3p": 9.5,
+                },
+                "memtimingspec": {
+                    "tCK": 0.416e-9,
+                    "RAS": 28,
+                    "RCD": 28,
+                    "RP": 14,
+                    "RFC1": 350,
+                    "RFC2": 260,
+                    "RFCsb": 140,
+                    "REFI": 7800,
+                },
+            },
+            "workload": {
+                "BNK_PRE_percent": 50.0,
+                "CKE_LO_PRE_percent": 0.0,
+                "CKE_LO_ACT_percent": 0.0,
+                "PageHit_percent": 50.0,
+                "RDsch_percent": 50.0,
+                "RD_Data_Low_percent": 25.0,
+                "WRsch_percent": 50.0,
+                "WR_Data_Low_percent": 25.0,
+                "termRDsch_percent": 50.0,
+                "termWRsch_percent": 50.0,
+                "System_tRC_ns": 46.0,
+                "tRRDsch_ns": 4.0,
+            },
+        }
+        single = client.post("/api/calculate/dimm", json=minimal_request)
+        assert single.status_code == 200
+        one = single.json()
+        mem = minimal_request["memspec"]
+        batch_body = {
+            "workload": minimal_request["workload"],
+            "memspecs": [mem, mem],
+        }
+        batch = client.post("/api/calculate/dimm/batch", json=batch_body)
+        assert batch.status_code == 200
+        body = batch.json()
+        assert "results" in body and len(body["results"]) == 2
+        for row in body["results"]:
+            assert row["P_total_core"] == pytest.approx(one["P_total_core"], rel=1e-9, abs=1e-12)
+            assert row["P_total"] == pytest.approx(one["P_total"], rel=1e-9, abs=1e-12)
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useCallback, useRef } from 'react';
+import { useMemo, useCallback, useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { BuilderDIMMBoard } from '@/components/BuilderDIMMBoard';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,8 @@ import {
 } from '@/lib/presets';
 import { useConfig } from '@/contexts/ConfigContext';
 import { computeCorePower, computeDIMMPower, formatPower } from '@/lib/ddr5Calculator';
-import type { MemSpec } from '@/lib/types';
+import { isApiAvailable, fetchDIMMPower } from '@/lib/api';
+import type { MemSpec, PowerResult, DIMMPowerResult } from '@/lib/types';
 import {
   deriveArchitectureFromBoard,
   canAddRank,
@@ -227,10 +228,44 @@ export function VisualBuilderContent({ onApply }: VisualBuilderContentProps) {
     };
   }, [nbrOfDevices, nbrOfRanks, width, nbrOfBanks, nbrOfBankGroups, nbrOfColumns, burstLength, speed]);
 
-  const powerResult = useMemo(() => {
-    const core = computeCorePower(derivedMemspec, defaultWorkload);
-    const dimm = computeDIMMPower(core, derivedMemspec, {});
-    return { core, dimm };
+  const [livePower, setLivePower] = useState<{
+    core: PowerResult;
+    dimm: DIMMPowerResult;
+  } | null>(null);
+  const [livePowerLoading, setLivePowerLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (isApiAvailable()) {
+        setLivePowerLoading(true);
+        try {
+          const dimm = await fetchDIMMPower(derivedMemspec, defaultWorkload);
+          if (!cancelled) {
+            setLivePower({ core: dimm.corePower, dimm });
+          }
+        } catch {
+          if (!cancelled) {
+            const core = computeCorePower(derivedMemspec, defaultWorkload);
+            const dimm = computeDIMMPower(core, derivedMemspec, {});
+            setLivePower({ core, dimm });
+          }
+        } finally {
+          if (!cancelled) setLivePowerLoading(false);
+        }
+        return;
+      }
+      const core = computeCorePower(derivedMemspec, defaultWorkload);
+      const dimm = computeDIMMPower(core, derivedMemspec, {});
+      if (!cancelled) {
+        setLivePower({ core, dimm });
+        setLivePowerLoading(false);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
   }, [derivedMemspec]);
 
   const handleUseConfig = () => {
@@ -394,8 +429,14 @@ export function VisualBuilderContent({ onApply }: VisualBuilderContentProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-1 text-sm">
-                <div>Core total: {formatPower(powerResult.core.P_total_core)}</div>
-                <div>DIMM total: {formatPower(powerResult.dimm.P_total_DIMM)}</div>
+                {livePowerLoading || !livePower ? (
+                  <div className="text-muted-foreground">Calculating…</div>
+                ) : (
+                  <>
+                    <div>Core total: {formatPower(livePower.core.P_total_core)}</div>
+                    <div>DIMM total: {formatPower(livePower.dimm.P_total_DIMM)}</div>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>

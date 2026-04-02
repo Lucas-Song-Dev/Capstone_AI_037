@@ -90,13 +90,15 @@ export function PowerDetails({ powerResult }: PowerDetailsProps) {
                   {formatPower(item.value)}
                 </span>
               </div>
-              <div className="relative h-1.5 bg-secondary rounded-full overflow-hidden">
-                <div 
-                  className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300`}
-                  style={{ 
+              <div
+                className="relative h-px w-full overflow-hidden rounded-full bg-border/45"
+                aria-hidden
+              >
+                <div
+                  className="absolute left-0 top-0 h-full min-h-px max-w-full rounded-full transition-[width] duration-300"
+                  style={{
                     width: `${Math.min(percentage, 100)}%`,
                     backgroundColor: `var(--${item.color.replace('text-', '')})`,
-                    boxShadow: `0 0 8px var(--${item.color.replace('text-', '')})`
                   }}
                 />
               </div>

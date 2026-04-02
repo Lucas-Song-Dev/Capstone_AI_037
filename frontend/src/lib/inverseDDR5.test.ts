@@ -1,9 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { inverseSearchForTarget } from "./inverseDDR5";
 import { memoryPresets, defaultWorkload } from "./presets";
 import { computeCorePower, computeDIMMPower } from "./ddr5Calculator";
 
 describe("inverseSearchForTarget", () => {
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("can approximately recover a known preset total core power", async () => {
     const preset = memoryPresets[0];
     const workload = defaultWorkload;
