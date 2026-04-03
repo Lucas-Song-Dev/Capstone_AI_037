@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 from fastapi.testclient import TestClient
 
+from .api_payload import memspec_obj_to_api_dict, workload_obj_to_api_dict
+
 # Add api to path (main.py is in api/)
 project_root = Path(__file__).parent.parent.parent
 api_path = project_root / "api"
@@ -54,8 +56,6 @@ class TestFullStackIntegration:
     
     def test_backend_api_uses_core(self, api_client, sample_memspec_path, sample_workload_path, core_modules):
         """Test that API correctly uses core package."""
-        import json
-        
         load_memspec = core_modules["load_memspec"]
         load_workload = core_modules["load_workload"]
         
@@ -63,70 +63,9 @@ class TestFullStackIntegration:
         memspec = load_memspec(str(sample_memspec_path))
         workload = load_workload(str(sample_workload_path))
         
-        # Convert to API format
         request_data = {
-            "memspec": {
-                "memoryId": memspec.memoryId,
-                "memoryType": memspec.memoryType,
-                "memarchitecturespec": {
-                    "width": memspec.memarchitecturespec.width,
-                    "nbrOfBanks": memspec.memarchitecturespec.nbrOfBanks,
-                    "nbrOfBankGroups": memspec.memarchitecturespec.nbrOfBankGroups,
-                    "nbrOfRanks": memspec.memarchitecturespec.nbrOfRanks,
-                    "nbrOfColumns": memspec.memarchitecturespec.nbrOfColumns,
-                    "nbrOfRows": memspec.memarchitecturespec.nbrOfRows,
-                    "nbrOfDevices": memspec.memarchitecturespec.nbrOfDevices,
-                    "burstLength": memspec.memarchitecturespec.burstLength,
-                    "dataRate": memspec.memarchitecturespec.dataRate,
-                },
-                "mempowerspec": {
-                    "vdd": memspec.mempowerspec.vdd,
-                    "vpp": memspec.mempowerspec.vpp,
-                    "vddq": memspec.mempowerspec.vddq,
-                    "idd0": memspec.mempowerspec.idd0,
-                    "idd2n": memspec.mempowerspec.idd2n,
-                    "idd3n": memspec.mempowerspec.idd3n,
-                    "idd4r": memspec.mempowerspec.idd4r,
-                    "idd4w": memspec.mempowerspec.idd4w,
-                    "idd5b": memspec.mempowerspec.idd5b,
-                    "idd6n": memspec.mempowerspec.idd6n,
-                    "idd2p": memspec.mempowerspec.idd2p,
-                    "idd3p": memspec.mempowerspec.idd3p,
-                    "ipp0": memspec.mempowerspec.ipp0,
-                    "ipp2n": memspec.mempowerspec.ipp2n,
-                    "ipp3n": memspec.mempowerspec.ipp3n,
-                    "ipp4r": memspec.mempowerspec.ipp4r,
-                    "ipp4w": memspec.mempowerspec.ipp4w,
-                    "ipp5b": memspec.mempowerspec.ipp5b,
-                    "ipp6n": memspec.mempowerspec.ipp6n,
-                    "ipp2p": memspec.mempowerspec.ipp2p,
-                    "ipp3p": memspec.mempowerspec.ipp3p,
-                },
-                "memtimingspec": {
-                    "tCK": memspec.memtimingspec.tCK,
-                    "RAS": memspec.memtimingspec.RAS,
-                    "RCD": memspec.memtimingspec.RCD,
-                    "RP": memspec.memtimingspec.RP,
-                    "RFC1": memspec.memtimingspec.RFC1,
-                    "RFC2": memspec.memtimingspec.RFC2,
-                    "RFCsb": memspec.memtimingspec.RFCsb,
-                    "REFI": memspec.memtimingspec.REFI,
-                }
-            },
-            "workload": {
-                "BNK_PRE_percent": workload.BNK_PRE_percent,
-                "CKE_LO_PRE_percent": workload.CKE_LO_PRE_percent,
-                "CKE_LO_ACT_percent": workload.CKE_LO_ACT_percent,
-                "PageHit_percent": workload.PageHit_percent,
-                "RDsch_percent": workload.RDsch_percent,
-                "RD_Data_Low_percent": workload.RD_Data_Low_percent,
-                "WRsch_percent": workload.WRsch_percent,
-                "WR_Data_Low_percent": workload.WR_Data_Low_percent,
-                "termRDsch_percent": workload.termRDsch_percent,
-                "termWRsch_percent": workload.termWRsch_percent,
-                "System_tRC_ns": workload.System_tRC_ns,
-                "tRRDsch_ns": workload.tRRDsch_ns,
-            }
+            "memspec": memspec_obj_to_api_dict(memspec),
+            "workload": workload_obj_to_api_dict(workload),
         }
         
         # Test API endpoint
@@ -153,70 +92,9 @@ class TestFullStackIntegration:
         ddr5 = DDR5(memspec, workload, core_model=core_model)
         core_result = ddr5.compute_core()
         
-        # Step 2: Backend API can compute same thing
         request_data = {
-            "memspec": {
-                "memoryId": memspec.memoryId,
-                "memoryType": memspec.memoryType,
-                "memarchitecturespec": {
-                    "width": memspec.memarchitecturespec.width,
-                    "nbrOfBanks": memspec.memarchitecturespec.nbrOfBanks,
-                    "nbrOfBankGroups": memspec.memarchitecturespec.nbrOfBankGroups,
-                    "nbrOfRanks": memspec.memarchitecturespec.nbrOfRanks,
-                    "nbrOfColumns": memspec.memarchitecturespec.nbrOfColumns,
-                    "nbrOfRows": memspec.memarchitecturespec.nbrOfRows,
-                    "nbrOfDevices": memspec.memarchitecturespec.nbrOfDevices,
-                    "burstLength": memspec.memarchitecturespec.burstLength,
-                    "dataRate": memspec.memarchitecturespec.dataRate,
-                },
-                "mempowerspec": {
-                    "vdd": memspec.mempowerspec.vdd,
-                    "vpp": memspec.mempowerspec.vpp,
-                    "vddq": memspec.mempowerspec.vddq,
-                    "idd0": memspec.mempowerspec.idd0,
-                    "idd2n": memspec.mempowerspec.idd2n,
-                    "idd3n": memspec.mempowerspec.idd3n,
-                    "idd4r": memspec.mempowerspec.idd4r,
-                    "idd4w": memspec.mempowerspec.idd4w,
-                    "idd5b": memspec.mempowerspec.idd5b,
-                    "idd6n": memspec.mempowerspec.idd6n,
-                    "idd2p": memspec.mempowerspec.idd2p,
-                    "idd3p": memspec.mempowerspec.idd3p,
-                    "ipp0": memspec.mempowerspec.ipp0,
-                    "ipp2n": memspec.mempowerspec.ipp2n,
-                    "ipp3n": memspec.mempowerspec.ipp3n,
-                    "ipp4r": memspec.mempowerspec.ipp4r,
-                    "ipp4w": memspec.mempowerspec.ipp4w,
-                    "ipp5b": memspec.mempowerspec.ipp5b,
-                    "ipp6n": memspec.mempowerspec.ipp6n,
-                    "ipp2p": memspec.mempowerspec.ipp2p,
-                    "ipp3p": memspec.mempowerspec.ipp3p,
-                },
-                "memtimingspec": {
-                    "tCK": memspec.memtimingspec.tCK,
-                    "RAS": memspec.memtimingspec.RAS,
-                    "RCD": memspec.memtimingspec.RCD,
-                    "RP": memspec.memtimingspec.RP,
-                    "RFC1": memspec.memtimingspec.RFC1,
-                    "RFC2": memspec.memtimingspec.RFC2,
-                    "RFCsb": memspec.memtimingspec.RFCsb,
-                    "REFI": memspec.memtimingspec.REFI,
-                }
-            },
-            "workload": {
-                "BNK_PRE_percent": workload.BNK_PRE_percent,
-                "CKE_LO_PRE_percent": workload.CKE_LO_PRE_percent,
-                "CKE_LO_ACT_percent": workload.CKE_LO_ACT_percent,
-                "PageHit_percent": workload.PageHit_percent,
-                "RDsch_percent": workload.RDsch_percent,
-                "RD_Data_Low_percent": workload.RD_Data_Low_percent,
-                "WRsch_percent": workload.WRsch_percent,
-                "WR_Data_Low_percent": workload.WR_Data_Low_percent,
-                "termRDsch_percent": workload.termRDsch_percent,
-                "termWRsch_percent": workload.termWRsch_percent,
-                "System_tRC_ns": workload.System_tRC_ns,
-                "tRRDsch_ns": workload.tRRDsch_ns,
-            }
+            "memspec": memspec_obj_to_api_dict(memspec),
+            "workload": workload_obj_to_api_dict(workload),
         }
         
         api_response = api_client.post("/api/calculate/core", json=request_data)

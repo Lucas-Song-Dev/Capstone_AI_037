@@ -49,10 +49,11 @@ def sample_workload_path():
 
 @pytest.fixture
 def api_compatible_memspec():
-    """Same shape as api/tests/conftest sample_memspec (Pydantic batch + single endpoints)."""
+    """Payload for calculate routes; includes fields required on main (registered, nbrOfDBs)."""
     return {
         "memoryId": "test_ddr5",
         "memoryType": "DDR5",
+        "registered": "false",
         "memarchitecturespec": {
             "width": 8,
             "nbrOfBanks": 16,
@@ -61,6 +62,7 @@ def api_compatible_memspec():
             "nbrOfColumns": 1024,
             "nbrOfRows": 65536,
             "nbrOfDevices": 1,
+            "nbrOfDBs": 8,
             "burstLength": 16,
             "dataRate": 2,
         },
