@@ -7,6 +7,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { HintWithTooltip } from '@/components/DescriptionTooltip';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
@@ -317,7 +318,7 @@ function SliderControl({ label, value, min, max, step, unit, onChange, color, hi
           {formatTick(value, step)} {unit}
         </span>
       </div>
-      {hint ? <p className="text-xs text-muted-foreground leading-snug">{hint}</p> : null}
+      {hint ? <HintWithTooltip text={hint} /> : null}
       <Slider
         value={[value]}
         min={min}

@@ -11,6 +11,10 @@ import { ArrowLeft } from 'lucide-react';
 import { SpotlightTutorial } from '@/components/SpotlightTutorial';
 import { DIMM_POWER_TUTORIAL_STEPS } from '@/config/spotlight-page-steps';
 import { ONBOARDING_DIMM_POWER_KEY } from '@/lib/onboarding-storage';
+import { DescriptionWithTooltip } from '@/components/DescriptionTooltip';
+
+const DIMM_PAGE_INTRO =
+  'Complete DIMM power includes die (core) contribution scaled by chip count, VDDQ interface power, and modeled overhead such as PMIC loss. Results use the same Python-backed API as the rest of the app when a backend URL or same-origin proxy is available. Adjust memory and workload on Configuration before analyzing here.';
 
 export default function DIMMPower() {
   const { memspec, workload } = useConfig();
@@ -27,9 +31,7 @@ export default function DIMMPower() {
         <div className="mb-6 flex items-center justify-between gap-4">
           <div data-tutorial="dimm-power-intro">
             <h1 className="text-3xl font-bold mb-2">Total DIMM Power Analysis</h1>
-            <p className="text-muted-foreground">
-              Complete DIMM power consumption including core, interface, and overhead components
-            </p>
+            <DescriptionWithTooltip variant="plain" label="About DIMM analysis" text={DIMM_PAGE_INTRO} />
           </div>
           <Button
             data-tutorial="dimm-power-back"

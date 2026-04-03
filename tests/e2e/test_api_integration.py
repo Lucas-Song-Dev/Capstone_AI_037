@@ -2,6 +2,8 @@
 Tests for API integration with core package.
 """
 
+import copy
+
 import pytest
 from fastapi.testclient import TestClient
 import sys
@@ -28,10 +30,14 @@ class TestAPIIntegration:
         """Test API health endpoints."""
         response = client.get("/")
         assert response.status_code == 200
-        
+
         response = client.get("/health")
         assert response.status_code == 200
         assert response.json()["status"] == "healthy"
+
+        r2 = client.get("/api/health")
+        assert r2.status_code == 200
+        assert r2.json()["status"] == "healthy"
     
     def test_all_endpoints_exist(self, client):
         """Test that all API endpoints are accessible."""
@@ -49,7 +55,7 @@ class TestAPIIntegration:
                     "nbrOfColumns": 1024,
                     "nbrOfRows": 65536,
                     "nbrOfDevices": 1,
-                    "nbrOfDBs": 0,
+                    "nbrOfDBs": 8,
                     "burstLength": 16,
                     "dataRate": 2
                 },
@@ -87,11 +93,33 @@ class TestAPIIntegration:
             "/api/calculate/core",
             "/api/calculate/interface",
             "/api/calculate/all",
-            "/api/calculate/dimm"
+            "/api/calculate/dimm",
         ]
-        
+
         for endpoint in endpoints:
             response = client.post(endpoint, json=minimal_request)
             assert response.status_code == 200, f"Endpoint {endpoint} failed"
             assert response.json() is not None
+
+    def test_dimm_batch_endpoint_matches_single_dimm_totals(
+        self, client, api_compatible_memspec, api_compatible_workload
+    ):
+        """Batch route used by inverse search; totals should match single /dimm for same memspec."""
+        minimal_request = {"memspec": api_compatible_memspec, "workload": api_compatible_workload}
+        single = client.post("/api/calculate/dimm", json=minimal_request)
+        assert single.status_code == 200, single.text
+        one = single.json()
+        mem_a = copy.deepcopy(api_compatible_memspec)
+        mem_b = copy.deepcopy(api_compatible_memspec)
+        batch_body = {
+            "workload": copy.deepcopy(api_compatible_workload),
+            "memspecs": [mem_a, mem_b],
+        }
+        batch = client.post("/api/calculate/dimm/batch", json=batch_body)
+        assert batch.status_code == 200, batch.text
+        body = batch.json()
+        assert "results" in body and len(body["results"]) == 2
+        for row in body["results"]:
+            assert row["P_total_core"] == pytest.approx(one["P_total_core"], rel=1e-9, abs=1e-12)
+            assert row["P_total"] == pytest.approx(one["P_total"], rel=1e-9, abs=1e-12)
 

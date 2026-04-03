@@ -6,6 +6,7 @@ JEDEC-compliant DDR5 power modeling and calculation tool with Next.js frontend a
 
 ```
 .
+├── package.json             # Minimal root manifest (Next.js) for Vercel; real app is frontend/
 ├── core/                    # Python package (core calculations)
 │   ├── src/                # Package source code
 │   ├── tests/              # Unit tests

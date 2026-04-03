@@ -3,14 +3,14 @@ name: Core Package - Regression Test
 on:
   # Run on pull requests
   pull_request:
-    branches: [ main, master, develop, test, fullstack ]
+    branches: [ main, master, develop, test, fullstack, fullstack-ui-3js ]
     paths:
       - 'core/**'
       - '.github/workflows/regression-test.yml'
   
   # Run on pushes to main/master to update baseline
   push:
-    branches: [ main, master, fullstack ]
+    branches: [ main, master, fullstack, fullstack-ui-3js ]
     paths:
       - 'core/**'
   

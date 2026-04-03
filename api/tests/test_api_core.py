@@ -51,6 +51,18 @@ def test_calculate_core_power_invalid_data(client):
     assert response.status_code == 422  # Validation error
 
 
+def test_calculate_core_accepts_float_timing_cycles(client, sample_memspec, sample_workload):
+    """Frontend/JSON may send cycle counts as floats; API coerces to int like core/parser."""
+    data = {"memspec": dict(sample_memspec), "workload": sample_workload}
+    t = dict(data["memspec"]["memtimingspec"])
+    t["RAS"] = 76.923
+    t["RCD"] = 28.4
+    data["memspec"]["memtimingspec"] = t
+    response = client.post("/api/calculate/core", json=data)
+    assert response.status_code == 200
+    assert response.json()["P_total_core"] > 0
+
+
 def test_calculate_all_power(client, sample_memspec, sample_workload):
     """Test complete power calculation endpoint."""
     request_data = {
@@ -66,3 +78,29 @@ def test_calculate_all_power(client, sample_memspec, sample_workload):
     assert "P_total_core" in result
     assert "P_total_interface" in result
     assert "P_total" in result
+
+
+def test_calculate_dimm_batch(client, sample_memspec, sample_workload):
+    """Batch DIMM endpoint returns one result per memspec in order."""
+    request_data = {
+        "workload": sample_workload,
+        "memspecs": [sample_memspec, sample_memspec],
+    }
+    response = client.post("/api/calculate/dimm/batch", json=request_data)
+    assert response.status_code == 200
+    body = response.json()
+    assert "results" in body
+    assert len(body["results"]) == 2
+    for row in body["results"]:
+        assert "P_total_core" in row
+        assert "P_total" in row
+        assert row["P_total_core"] > 0
+
+
+def test_calculate_dimm_batch_empty(client, sample_workload):
+    response = client.post(
+        "/api/calculate/dimm/batch",
+        json={"workload": sample_workload, "memspecs": []},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"results": []}

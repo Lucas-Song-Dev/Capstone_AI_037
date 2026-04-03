@@ -2,12 +2,12 @@ name: Frontend Tests
 
 on:
   push:
-    branches: [ main, master, fullstack ]
+    branches: [ main, master, fullstack, fullstack-ui-3js ]
     paths:
       - 'frontend/**'
       - '.github/workflows/frontend-test.yml'
   pull_request:
-    branches: [ main, master, fullstack ]
+    branches: [ main, master, fullstack, fullstack-ui-3js ]
     paths:
       - 'frontend/**'
   workflow_dispatch:

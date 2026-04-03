@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Header } from "@/components/Header";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,10 @@ import { useRouter } from "next/navigation";
 import { SpotlightTutorial } from "@/components/SpotlightTutorial";
 import { SERVER_DEPLOYMENT_TUTORIAL_STEPS } from "@/config/spotlight-page-steps";
 import { ONBOARDING_SERVER_DEPLOYMENT_KEY } from "@/lib/onboarding-storage";
+import { DescriptionWithTooltip } from "@/components/DescriptionTooltip";
+
+const SERVER_DEPLOYMENT_INTRO =
+  "Search memory presets against power, bandwidth, and capacity limits you set. Ranked results favor efficient configs that still meet every constraint. Pick a row to inspect power charts and rack-scale totals before sending the memspec back to Configuration.";
 
 export default function ServerDeployment() {
   const { setMemspec, setWorkload } = useConfig();
@@ -41,43 +45,43 @@ export default function ServerDeployment() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     setError(null);
     setSelectedConfig(null);
-    
+
     const powerBudgetNum = parseFloat(powerBudget);
     const minDataRateNum = parseFloat(minDataRate);
     const totalCapacityNum = parseFloat(totalCapacity);
     const maxDIMMsNum = parseInt(maxDIMMs);
-    
+
     if (!Number.isFinite(powerBudgetNum) || powerBudgetNum <= 0) {
       setError("Power budget must be a positive number");
       return;
     }
-    
+
     if (!Number.isFinite(minDataRateNum) || minDataRateNum <= 0) {
       setError("Minimum data rate must be a positive number");
       return;
     }
-    
+
     if (!Number.isFinite(totalCapacityNum) || totalCapacityNum <= 0) {
       setError("Total capacity must be a positive number");
       return;
     }
-    
+
     if (!Number.isFinite(maxDIMMsNum) || maxDIMMsNum < 1 || maxDIMMsNum > 16) {
       setError("Max DIMMs must be between 1 and 16");
       return;
     }
-    
+
     const numServersNum = parseFloat(numServers);
     if (!Number.isFinite(numServersNum) || numServersNum < 1 || numServersNum > 1000000) {
       setError("Number of servers must be between 1 and 1,000,000");
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
       const requirements: ServerRequirements = {
         powerBudgetPerServer: powerBudgetNum,
@@ -86,17 +90,17 @@ export default function ServerDeployment() {
         workloadType,
         dimmsPerServer: maxDIMMsNum,
       };
-      
-      const results = findServerConfigurations(requirements);
-      
+
+      const results = await findServerConfigurations(requirements);
+
       if (results.length === 0) {
         setError("No configurations found that meet all requirements. Try relaxing constraints.");
       } else {
         setConfigurations(results);
-        setSelectedConfig(results[0]); // Select best match
+        setSelectedConfig(results[0]);
       }
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to find configurations");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to find configurations");
     } finally {
       setLoading(false);
     }
@@ -122,18 +126,18 @@ export default function ServerDeployment() {
               <Server className="w-8 h-8 text-primary" />
               Server Deployment Designer
             </h1>
-            <p className="text-muted-foreground">
-              Find optimal DDR5 memory configurations for your server requirements
-            </p>
+            <DescriptionWithTooltip variant="plain" label="About server deployment" text={SERVER_DEPLOYMENT_INTRO} />
           </div>
 
           {/* Requirements Input Card */}
           <Card className="power-card" data-tutorial="server-requirements-card">
             <CardHeader>
               <CardTitle>Server Requirements</CardTitle>
-              <CardDescription>
-                Enter your server deployment requirements to find matching memory configurations
-              </CardDescription>
+              <DescriptionWithTooltip
+                variant="card"
+                label="Requirements card"
+                text="Enter numeric limits for power, data rate, capacity, DIMM slots, server count, and workload. The designer scores presets that satisfy all constraints. You can relax inputs and search again if nothing matches."
+              />
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-tutorial="server-req-hardware">

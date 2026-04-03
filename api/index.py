@@ -1,22 +1,22 @@
 """
-Vercel serverless function entry point for FastAPI.
+Vercel serverless entry for FastAPI.
 
-Vercel expects a handler function that receives a request object.
+Loads ``api/main.py`` by file path so ``import main`` never resolves to ``core/src/main.py``
+(regardless of ``sys.path`` order from editable installs, e2e conftest, or other imports).
 """
 
-# Vercel serverless function entry point
-import sys
+from __future__ import annotations
+
+import importlib.util
 from pathlib import Path
 
-# Add core/src to path
-project_root = Path(__file__).parent.parent
-core_src_path = project_root / "core" / "src"
-sys.path.insert(0, str(core_src_path))
+_api_dir = Path(__file__).resolve().parent
+_main_path = _api_dir / "main.py"
+_spec = importlib.util.spec_from_file_location("_ddr5_api_main", _main_path)
+if _spec is None or _spec.loader is None:
+    raise RuntimeError(f"Cannot load FastAPI app from {_main_path}")
+_main_mod = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_main_mod)
+app = _main_mod.app
 
-# main.py is in the same directory (api/)
-from main import app
-from mangum import Mangum
-
-# Wrap FastAPI app with Mangum for AWS Lambda/Vercel compatibility
-handler = Mangum(app, lifespan="off")
-
+__all__ = ["app"]

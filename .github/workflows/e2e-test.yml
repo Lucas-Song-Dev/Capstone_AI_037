@@ -2,20 +2,22 @@ name: End-to-End Tests
 
 on:
   push:
-    branches: [ main, master, fullstack ]
+    branches: [ main, master, fullstack, fullstack-ui-3js ]
     paths:
       - 'core/**'
       - 'api/**'
       - 'frontend/**'
       - 'tests/**'
+      - 'vercel.json'
       - '.github/workflows/e2e-test.yml'
   pull_request:
-    branches: [ main, master, fullstack ]
+    branches: [ main, master, fullstack, fullstack-ui-3js ]
     paths:
       - 'core/**'
       - 'api/**'
       - 'frontend/**'
       - 'tests/**'
+      - 'vercel.json'
   workflow_dispatch:
 
 jobs:

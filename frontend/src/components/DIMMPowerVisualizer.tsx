@@ -14,7 +14,8 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DescriptionWithTooltip } from '@/components/DescriptionTooltip';
 import { Badge } from '@/components/ui/badge';
 import { Cpu, Zap, Settings, MemoryStick } from 'lucide-react';
 import type { DIMMPowerResult, MemSpec } from '@/lib/types';
@@ -108,9 +109,12 @@ export function DIMMPowerVisualizer({ dimmPower, memspec }: DIMMPowerVisualizerP
               {dimmPower.chipsPerDIMM} chips
             </Badge>
           </CardTitle>
-          <CardDescription className="text-xs relative pt-1">
-            Module total includes die (core) power, VDDQ interface, and overhead such as PMIC loss and RCD where modeled—distinct from die-only Core Power.
-          </CardDescription>
+          <DescriptionWithTooltip
+            variant="card"
+            className="text-xs relative pt-1"
+            label="About module total"
+            text="Module total includes die (core) power, VDDQ interface, and overhead such as PMIC loss and RCD where modeled—distinct from die-only Core Power."
+          />
         </CardHeader>
         <CardContent className="!p-4 !pt-0 relative">
           <div className="text-center mb-4">
@@ -152,9 +156,12 @@ export function DIMMPowerVisualizer({ dimmPower, memspec }: DIMMPowerVisualizerP
           <CardTitle className="text-sm font-medium text-muted-foreground">
             DIMM Power Breakdown (W)
           </CardTitle>
-          <CardDescription className="text-xs pt-1">
-            Same categories as the summary tiles above; values are watts so they align with the headline module total.
-          </CardDescription>
+          <DescriptionWithTooltip
+            variant="card"
+            className="text-xs pt-1"
+            label="About this chart"
+            text="Same categories as the summary tiles above; values are watts so they align with the headline module total."
+          />
         </CardHeader>
         <CardContent className="!p-4 !pt-0">
           <ResponsiveContainer width="100%" height={200}>
@@ -246,11 +253,14 @@ export function DIMMPowerVisualizer({ dimmPower, memspec }: DIMMPowerVisualizerP
                 {formatPower(dimmPower.P_core_DIMM, 3)}
               </span>
             </div>
-            <div className="relative h-1.5 bg-secondary rounded-full overflow-hidden">
-              <div 
-                className="absolute inset-y-0 left-0 rounded-full"
-                style={{ 
-                  width: `${corePercent}%`,
+            <div
+              className="relative h-px w-full overflow-hidden rounded-full bg-border/45"
+              aria-hidden
+            >
+              <div
+                className="absolute left-0 top-0 h-full min-h-px max-w-full rounded-full"
+                style={{
+                  width: `${Math.min(Math.max(0, parseFloat(corePercent) || 0), 100)}%`,
                   backgroundColor: COLORS.core,
                 }}
               />
@@ -267,11 +277,14 @@ export function DIMMPowerVisualizer({ dimmPower, memspec }: DIMMPowerVisualizerP
                 {formatPower(dimmPower.P_interface_DIMM, 3)}
               </span>
             </div>
-            <div className="relative h-1.5 bg-secondary rounded-full overflow-hidden">
-              <div 
-                className="absolute inset-y-0 left-0 rounded-full"
-                style={{ 
-                  width: `${interfacePercent}%`,
+            <div
+              className="relative h-px w-full overflow-hidden rounded-full bg-border/45"
+              aria-hidden
+            >
+              <div
+                className="absolute left-0 top-0 h-full min-h-px max-w-full rounded-full"
+                style={{
+                  width: `${Math.min(Math.max(0, parseFloat(interfacePercent) || 0), 100)}%`,
                   backgroundColor: COLORS.interface,
                 }}
               />
@@ -288,11 +301,14 @@ export function DIMMPowerVisualizer({ dimmPower, memspec }: DIMMPowerVisualizerP
                 {formatPower(dimmPower.P_overhead_DIMM, 3)}
               </span>
             </div>
-            <div className="relative h-1.5 bg-secondary rounded-full overflow-hidden">
-              <div 
-                className="absolute inset-y-0 left-0 rounded-full"
-                style={{ 
-                  width: `${overheadPercent}%`,
+            <div
+              className="relative h-px w-full overflow-hidden rounded-full bg-border/45"
+              aria-hidden
+            >
+              <div
+                className="absolute left-0 top-0 h-full min-h-px max-w-full rounded-full"
+                style={{
+                  width: `${Math.min(Math.max(0, parseFloat(overheadPercent) || 0), 100)}%`,
                   backgroundColor: COLORS.overhead,
                 }}
               />
