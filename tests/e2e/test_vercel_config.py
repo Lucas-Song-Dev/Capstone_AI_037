@@ -40,7 +40,7 @@ def test_vercel_json_api_rewrite_to_serverless_index(vercel_json: dict) -> None:
         ),
         None,
     )
-    assert match is not None, "Expected rewrite /api/(.*) -> /api/index for Mangum handler"
+    assert match is not None, "Expected rewrite /api/(.*) -> /api/index for FastAPI serverless entry"
 
 
 def test_vercel_json_python_function_config(vercel_json: dict) -> None:
@@ -49,10 +49,11 @@ def test_vercel_json_python_function_config(vercel_json: dict) -> None:
     assert isinstance(idx, dict) and "maxDuration" in idx, "api/index.py should set maxDuration for long batched calls"
 
 
-def test_api_serverless_entry_has_mangum_handler() -> None:
+def test_api_serverless_entry_exposes_asgi_app() -> None:
     index_py = PROJECT_ROOT / "api" / "index.py"
     text = index_py.read_text(encoding="utf-8")
-    assert "Mangum" in text and "handler" in text
+    assert "from main import app" in text
+    assert "Mangum" not in text
     assert "core" in text and "src" in text
 
 

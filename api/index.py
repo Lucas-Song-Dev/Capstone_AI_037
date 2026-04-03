@@ -1,22 +1,16 @@
 """
-Vercel serverless function entry point for FastAPI.
+Vercel serverless entry for FastAPI.
 
-Vercel expects a handler function that receives a request object.
+The Python runtime invokes the ASGI ``app`` in this module (same pattern as Vercel’s FastAPI
+template). The platform calls ASGI directly; no Lambda-style adapter is required.
 """
 
-# Vercel serverless function entry point
 import sys
 from pathlib import Path
 
-# Add core/src to path
-project_root = Path(__file__).parent.parent
-core_src_path = project_root / "core" / "src"
-sys.path.insert(0, str(core_src_path))
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root / "core" / "src"))
 
-# main.py is in the same directory (api/)
-from main import app
-from mangum import Mangum
+from main import app  # noqa: E402
 
-# Wrap FastAPI app with Mangum for AWS Lambda/Vercel compatibility
-handler = Mangum(app, lifespan="off")
-
+__all__ = ["app"]
