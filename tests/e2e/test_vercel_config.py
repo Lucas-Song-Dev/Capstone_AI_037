@@ -6,7 +6,9 @@ These do not call Vercel APIs; they assert local files and vercel.json stay alig
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -54,7 +56,15 @@ def test_api_serverless_entry_exposes_asgi_app() -> None:
     text = index_py.read_text(encoding="utf-8")
     assert "from main import app" in text
     assert "Mangum" not in text
-    assert "core" in text and "src" in text
+    # Load like Vercel: must resolve api/main.py (FastAPI), not core/src/main.py (CLI).
+    for key in list(sys.modules):
+        if key in ("main", "index", "api.main", "api.index"):
+            del sys.modules[key]
+    spec = importlib.util.spec_from_file_location("_vercel_index_test", index_py)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert getattr(mod.app, "title", None) == "DDR5 Power Calculator API"
 
 
 def test_api_index_imports_main_app() -> None:

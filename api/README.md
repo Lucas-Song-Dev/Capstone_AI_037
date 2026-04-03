@@ -3,7 +3,7 @@
 This folder contains the DDR5 Power Calculator API and its **Vercel serverless entry**.
 
 - **`main.py`** — FastAPI app (routes, CORS, core integration).
-- **`index.py`** — Vercel serverless entry: re-exports the FastAPI `app` ASGI application so `/api/*` on Vercel is served by this app.
+- **`index.py`** — Vercel serverless entry: imports `app` from **`main.py` in this folder** (it must not put `core/src` on `sys.path` first, or `main` resolves to `core/src/main.py` by mistake).
 
 Run locally: `uvicorn main:app --reload` from the `api/` directory (with `core` installed).
 

@@ -2,6 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  async redirects() {
+    return [{ source: '/favicon.ico', destination: '/placeholder.svg', permanent: false }];
+  },
   typescript: {
     ignoreBuildErrors: true, // Temporarily disabled to diagnose build hang
   },
