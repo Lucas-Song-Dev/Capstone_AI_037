@@ -65,6 +65,7 @@ export interface MemTimingSpec {
 export interface MemSpec {
   memoryId: string;
   memoryType: string;
+  registered: string | boolean;
   memarchitecturespec: MemArchitectureSpec;
   mempowerspec: MemPowerSpec;
   memtimingspec: MemTimingSpec;

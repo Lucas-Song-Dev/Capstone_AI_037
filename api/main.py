@@ -52,6 +52,7 @@ class MemArchitectureSpecModel(BaseModel):
     nbrOfColumns: int
     nbrOfRows: int
     nbrOfDevices: int
+    nbrOfDBs: int
     burstLength: int
     dataRate: int
 
@@ -129,6 +130,7 @@ class MemTimingSpecModel(BaseModel):
 class MemSpecModel(BaseModel):
     memoryId: str
     memoryType: str
+    registered: str
     memarchitecturespec: MemArchitectureSpecModel
     mempowerspec: MemPowerSpecModel
     memtimingspec: MemTimingSpecModel
@@ -176,6 +178,7 @@ def memspec_model_to_obj(memspec_model: MemSpecModel) -> MemSpec:
         nbrOfColumns=memspec_model.memarchitecturespec.nbrOfColumns,
         nbrOfRows=memspec_model.memarchitecturespec.nbrOfRows,
         nbrOfDevices=memspec_model.memarchitecturespec.nbrOfDevices,
+        nbrOfDBs=memspec_model.memarchitecturespec.nbrOfDBs,
         burstLength=memspec_model.memarchitecturespec.burstLength,
         dataRate=memspec_model.memarchitecturespec.dataRate,
     )
@@ -218,6 +221,7 @@ def memspec_model_to_obj(memspec_model: MemSpecModel) -> MemSpec:
     return MemSpec(
         memoryId=memspec_model.memoryId,
         memoryType=memspec_model.memoryType,
+        registered=memspec_model.registered,
         memarchitecturespec=arch,
         mempowerspec=power,
         memtimingspec=timing,
