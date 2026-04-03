@@ -54,11 +54,12 @@ def test_vercel_json_python_function_config(vercel_json: dict) -> None:
 def test_api_serverless_entry_exposes_asgi_app() -> None:
     index_py = PROJECT_ROOT / "api" / "index.py"
     text = index_py.read_text(encoding="utf-8")
-    assert "from main import app" in text
+    assert "spec_from_file_location" in text
+    assert "_ddr5_api_main" in text
     assert "Mangum" not in text
-    # Load like Vercel: must resolve api/main.py (FastAPI), not core/src/main.py (CLI).
+    # Reload entry without stale loader modules (matches cold start on Vercel).
     for key in list(sys.modules):
-        if key in ("main", "index", "api.main", "api.index"):
+        if key in ("_ddr5_api_main",) or key.endswith("_vercel_index_test"):
             del sys.modules[key]
     spec = importlib.util.spec_from_file_location("_vercel_index_test", index_py)
     assert spec and spec.loader
@@ -67,9 +68,10 @@ def test_api_serverless_entry_exposes_asgi_app() -> None:
     assert getattr(mod.app, "title", None) == "DDR5 Power Calculator API"
 
 
-def test_api_index_imports_main_app() -> None:
+def test_api_index_loads_main_by_file_path() -> None:
     text = (PROJECT_ROOT / "api" / "index.py").read_text(encoding="utf-8")
-    assert "from main import app" in text
+    assert "main.py" in text
+    assert "from main import app" not in text
 
 
 def test_core_src_on_disk_for_api_bundle() -> None:

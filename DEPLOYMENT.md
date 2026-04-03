@@ -5,7 +5,7 @@
 The project deploys to Vercel with:
 
 - **Frontend:** Next.js app in [`frontend/`](frontend/). The root [`vercel.json`](vercel.json) sets `installCommand`, `buildCommand`, and `outputDirectory` so builds run **from the repository root**. A minimal root [`package.json`](package.json) declares `next`; `installCommand` runs **`npm install` at the repo root** (so `node_modules/next` exists for Vercel’s version detection) **then** `npm install` under `frontend/`.
-- **API:** Serverless functions from the root [`api/`](api/) folder. `vercel.json` rewrites `/api/(.*)` to `/api/index`; [`api/index.py`](api/index.py) re-exports the FastAPI ASGI `app` from [`api/main.py`](api/main.py) for Vercel’s Python runtime (native ASGI, no Mangum).
+- **API:** Serverless functions from the root [`api/`](api/) folder. `vercel.json` rewrites `/api/(.*)` to `/api/index`; [`api/index.py`](api/index.py) loads [`api/main.py`](api/main.py) by file path and exposes the FastAPI ASGI `app` (avoids importing the wrong `main` when `core/src` is on `sys.path`).
 - **Core:** The API imports Python modules from [`core/src`](core/src). The repo root must be deployed so `core/` is available to the serverless bundle (Vercel includes the project tree under the configured root).
 
 ### Required: Vercel project root = repository root
