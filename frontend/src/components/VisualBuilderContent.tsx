@@ -12,8 +12,8 @@ import {
   SPEED_OPTIONS,
 } from '@/lib/presets';
 import { useConfig } from '@/contexts/ConfigContext';
-import { computeCorePower, computeDIMMPower, formatPower } from '@/lib/ddr5Calculator';
-import { isApiAvailable, fetchDIMMPower } from '@/lib/api';
+import { formatPower } from '@/lib/ddr5Calculator';
+import { tryApiThenLocalPower } from '@/lib/api';
 import type { MemSpec, PowerResult, DIMMPowerResult } from '@/lib/types';
 import {
   deriveArchitectureFromBoard,
@@ -237,29 +237,17 @@ export function VisualBuilderContent({ onApply }: VisualBuilderContentProps) {
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      if (isApiAvailable()) {
-        setLivePowerLoading(true);
-        try {
-          const dimm = await fetchDIMMPower(derivedMemspec, defaultWorkload);
-          if (!cancelled) {
-            setLivePower({ core: dimm.corePower, dimm });
-          }
-        } catch {
-          if (!cancelled) {
-            const core = computeCorePower(derivedMemspec, defaultWorkload);
-            const dimm = computeDIMMPower(core, derivedMemspec, {});
-            setLivePower({ core, dimm });
-          }
-        } finally {
-          if (!cancelled) setLivePowerLoading(false);
+      setLivePowerLoading(true);
+      try {
+        const { powerResult, dimmPowerResult } = await tryApiThenLocalPower(
+          derivedMemspec,
+          defaultWorkload
+        );
+        if (!cancelled) {
+          setLivePower({ core: powerResult, dimm: dimmPowerResult });
         }
-        return;
-      }
-      const core = computeCorePower(derivedMemspec, defaultWorkload);
-      const dimm = computeDIMMPower(core, derivedMemspec, {});
-      if (!cancelled) {
-        setLivePower({ core, dimm });
-        setLivePowerLoading(false);
+      } finally {
+        if (!cancelled) setLivePowerLoading(false);
       }
     };
     void run();

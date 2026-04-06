@@ -124,16 +124,24 @@ export default function TargetPower() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-xs text-muted-foreground border border-border/60 rounded-md px-3 py-2 bg-muted/20">
-                <strong className="text-foreground/90">Profile &amp; emphasis:</strong> they weight core vs module
-                errors in the loss. If optional DIMM target is empty, only core error is optimized; scaling it by a
-                constant does not change which candidate wins, so the dropdown/slider have little effect until you set
-                a DIMM power target.
-              </p>
               <div
                 className="grid grid-cols-1 md:grid-cols-2 gap-4"
                 data-tutorial="target-power-optimization"
               >
+                <div className="space-y-2 md:col-span-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      <strong className="text-foreground/90">Profile &amp; emphasis</strong>
+                    </span>
+                    <HelpTooltip label="Help: profile & emphasis" triggerClassName="shrink-0">
+                      <p className="text-sm">
+                        They weight core vs module errors in the loss. If optional DIMM target is empty, only core
+                        error is optimized; scaling it by a constant does not change which candidate wins, so the
+                        dropdown/slider have little effect until you set a DIMM power target.
+                      </p>
+                    </HelpTooltip>
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <label className="block text-xs font-medium text-muted-foreground">

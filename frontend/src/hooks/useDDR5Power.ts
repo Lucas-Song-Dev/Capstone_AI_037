@@ -1,11 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { MemSpec, Workload, PowerResult, DIMMPowerResult } from '@/lib/types';
-import { computeCorePower, computeDIMMPower } from '@/lib/ddr5Calculator';
-import {
-  isApiAvailable,
-  fetchCorePower,
-  fetchDIMMPower,
-} from '@/lib/api';
+import { tryApiThenLocalPower } from '@/lib/api';
 
 interface UseDDR5PowerOptions {
   debounceMs?: number;
@@ -49,21 +44,9 @@ export function useDDR5Power(
 
     const runCalculation = async () => {
       try {
-        if (isApiAvailable()) {
-          const [coreResult, dimmResult] = await Promise.all([
-            fetchCorePower(memspec, workload),
-            fetchDIMMPower(memspec, workload),
-          ]);
-          setPowerResult(coreResult);
-          setDimmPowerResult(dimmResult);
-        } else {
-          const coreResult = computeCorePower(memspec, workload);
-          setPowerResult(coreResult);
-          const dimmResult = computeDIMMPower(coreResult, memspec, {
-            isRDIMM: false,
-          });
-          setDimmPowerResult(dimmResult);
-        }
+        const { powerResult, dimmPowerResult } = await tryApiThenLocalPower(memspec, workload);
+        setPowerResult(powerResult);
+        setDimmPowerResult(dimmPowerResult);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Calculation failed'));

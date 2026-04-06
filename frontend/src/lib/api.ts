@@ -12,6 +12,7 @@
 
 import type { MemSpec, Workload, PowerResult, DIMMPowerResult } from './types';
 import { calculateChipsPerDIMM } from './ddr5Calculator';
+import { computePowerLocal, registeredToBoolean } from './powerCompute';
 
 export function getApiBase(): string {
   if (typeof process === 'undefined') return '';
@@ -33,15 +34,36 @@ export function isApiAvailable(): boolean {
   return Boolean(getApiBase());
 }
 
-/** Ensure memspec has nbrOfDevices for backend/core (default 1). */
+/**
+ * Shape memspec for FastAPI: `registered` as "true"/"false", `nbrOfDBs` and `nbrOfDevices` set.
+ * Mirrors tests/e2e/api_payload.py.
+ */
 export function normalizeMemspecForApi(memspec: MemSpec): MemSpec {
   const arch = memspec.memarchitecturespec;
-  if (arch.nbrOfDevices != null) return memspec;
+  const nbrOfDevices = arch.nbrOfDevices != null ? arch.nbrOfDevices : 1;
+  const nbrOfDBs =
+    arch.nbrOfDBs != null && !Number.isNaN(Number(arch.nbrOfDBs))
+      ? Math.round(Number(arch.nbrOfDBs))
+      : arch.nbrOfBankGroups ?? 8;
+  const registered = registeredToBoolean(memspec.registered) ? 'true' : 'false';
+
   return {
     ...memspec,
-    memarchitecturespec: { ...arch, nbrOfDevices: 1 },
+    registered,
+    memarchitecturespec: {
+      ...arch,
+      nbrOfDevices,
+      nbrOfDBs,
+    },
   };
 }
+
+export type TryApiThenLocalResult = {
+  powerResult: PowerResult;
+  dimmPowerResult: DIMMPowerResult;
+  /** True when API was attempted and failed; false when API unavailable or succeeded. */
+  usedFallback: boolean;
+};
 
 /** Map flat /api/calculate/dimm JSON to DIMMPowerResult (shared by single and batch). */
 export function dimmApiResponseToResult(
@@ -163,6 +185,29 @@ export async function fetchDIMMPower(
   }
   const raw = (await res.json()) as Record<string, number>;
   return dimmApiResponseToResult(raw, normalized);
+}
+
+/**
+ * Try Python API (core + DIMM); on any failure use in-browser calculator so the UI stays usable.
+ */
+export async function tryApiThenLocalPower(
+  memspec: MemSpec,
+  workload: Workload
+): Promise<TryApiThenLocalResult> {
+  if (!isApiAvailable()) {
+    const { powerResult, dimmPowerResult } = computePowerLocal(memspec, workload);
+    return { powerResult, dimmPowerResult, usedFallback: false };
+  }
+  try {
+    const [powerResult, dimmPowerResult] = await Promise.all([
+      fetchCorePower(memspec, workload),
+      fetchDIMMPower(memspec, workload),
+    ]);
+    return { powerResult, dimmPowerResult, usedFallback: false };
+  } catch {
+    const { powerResult, dimmPowerResult } = computePowerLocal(memspec, workload);
+    return { powerResult, dimmPowerResult, usedFallback: true };
+  }
 }
 
 const INVERSE_BATCH_CHUNK = 48;
