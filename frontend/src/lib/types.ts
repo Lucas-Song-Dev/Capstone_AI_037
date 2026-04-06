@@ -18,6 +18,8 @@ export interface MemArchitectureSpec {
   nbrOfRows: number;
   /** Number of DRAM devices per subchannel (e.g. 4 for x8 32-bit). Backend/core use this for DIMM and interface models. */
   nbrOfDevices?: number;
+  /** Data buffers per subchannel (RDIMM); required by FastAPI; defaults from nbrOfBankGroups when omitted. */
+  nbrOfDBs?: number;
   burstLength: number;
   dataRate: number;
 }

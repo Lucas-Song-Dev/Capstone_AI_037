@@ -65,6 +65,7 @@ class MemArchitectureSpecModel(BaseModel):
         "nbrOfColumns",
         "nbrOfRows",
         "nbrOfDevices",
+        "nbrOfDBs",
         "burstLength",
         "dataRate",
         mode="before",
@@ -166,6 +167,12 @@ class BatchDimmPowerRequest(BaseModel):
 MAX_DIMM_BATCH = 512
 
 
+def _registered_str_to_bool(s: str) -> bool:
+    """API accepts registered as string; core MemSpec uses bool."""
+    t = str(s).strip().lower()
+    return t in ("true", "1", "yes")
+
+
 def memspec_model_to_obj(memspec_model: MemSpecModel) -> MemSpec:
     """Convert Pydantic model to MemSpec object."""
     from parser import MemArchitectureSpec, MemPowerSpec, MemTimingSpec
@@ -221,7 +228,7 @@ def memspec_model_to_obj(memspec_model: MemSpecModel) -> MemSpec:
     return MemSpec(
         memoryId=memspec_model.memoryId,
         memoryType=memspec_model.memoryType,
-        registered=memspec_model.registered,
+        registered=_registered_str_to_bool(memspec_model.registered),
         memarchitecturespec=arch,
         mempowerspec=power,
         memtimingspec=timing,
