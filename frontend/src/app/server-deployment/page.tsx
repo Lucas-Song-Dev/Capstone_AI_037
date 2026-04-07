@@ -17,7 +17,19 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, Zap, MemoryStick, Gauge, Server } from "lucide-react";
 import { HelpTooltip } from "@/components/HelpTooltip";
-import { findServerConfigurations, formatServerSummary, type ServerRequirements, type ServerConfiguration } from "@/lib/serverDeployment";
+import {
+  findServerConfigurations,
+  SERVER_DEPLOYMENT_RANK_MAX,
+  type ServerRequirements,
+  type ServerConfiguration,
+  type DimmSearchMode,
+} from "@/lib/serverDeployment";
+import {
+  fleetMemoryPowerKw,
+  fleetMemoryCapacityTb,
+  rackCountForServers,
+} from "@/lib/serverDeploymentMetrics";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PowerBreakdownChart, TotalPowerDisplay } from "@/components/PowerChart";
 import { ServerRackVisualization } from "@/components/ServerRackVisualization";
 import { useConfig } from "@/contexts/ConfigContext";
@@ -39,8 +51,10 @@ export default function ServerDeployment() {
   const [totalCapacity, setTotalCapacity] = useState<string>("128");
   const [workloadType, setWorkloadType] = useState<ServerRequirements['workloadType']>("database_web");
   const [maxDIMMs, setMaxDIMMs] = useState<string>("8");
+  const [dimmSearchMode, setDimmSearchMode] = useState<DimmSearchMode>("optimize");
   const [numServers, setNumServers] = useState<string>("100");
   const [configurations, setConfigurations] = useState<ServerConfiguration[]>([]);
+  const [totalMatchedCount, setTotalMatchedCount] = useState<number | null>(null);
   const [selectedConfig, setSelectedConfig] = useState<ServerConfiguration | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -48,6 +62,7 @@ export default function ServerDeployment() {
   const handleSearch = async () => {
     setError(null);
     setSelectedConfig(null);
+    setTotalMatchedCount(null);
 
     const powerBudgetNum = parseFloat(powerBudget);
     const minDataRateNum = parseFloat(minDataRate);
@@ -89,15 +104,17 @@ export default function ServerDeployment() {
         totalCapacity: totalCapacityNum,
         workloadType,
         dimmsPerServer: maxDIMMsNum,
+        dimmSearchMode,
       };
 
-      const results = await findServerConfigurations(requirements);
+      const { rankedConfigurations, totalMatched } = await findServerConfigurations(requirements);
 
-      if (results.length === 0) {
+      if (rankedConfigurations.length === 0) {
         setError("No configurations found that meet all requirements. Try relaxing constraints.");
       } else {
-        setConfigurations(results);
-        setSelectedConfig(results[0]);
+        setConfigurations(rankedConfigurations);
+        setTotalMatchedCount(totalMatched);
+        setSelectedConfig(rankedConfigurations[0]);
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to find configurations");
@@ -241,6 +258,61 @@ export default function ServerDeployment() {
                     placeholder="8"
                   />
                 </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <div className="flex items-center gap-2">
+                    <Label>DIMM search mode</Label>
+                    <HelpTooltip label="Help: DIMM search mode">
+                      <p className="text-sm">
+                        <strong>Optimize</strong> tries every DIMM count from 1 up to your maximum slots and keeps
+                        configs that meet your targets—fewer DIMMs can rank higher when they still satisfy capacity
+                        because memory power is lower.
+                        <br />
+                        <br />
+                        <strong>All slots filled</strong> only evaluates fully populated servers (DIMMs = max slots) so
+                        you compare presets on equal footing for &quot;fleet at full memory fill&quot; planning.
+                      </p>
+                    </HelpTooltip>
+                  </div>
+                  <ToggleGroup
+                    type="single"
+                    value={dimmSearchMode}
+                    onValueChange={(v) => {
+                      if (v === "optimize" || v === "max_slots") setDimmSearchMode(v);
+                    }}
+                    variant="outline"
+                    className="flex flex-wrap justify-start gap-1"
+                  >
+                    <ToggleGroupItem value="optimize" className="text-xs sm:text-sm px-3">
+                      Optimize (1–max slots)
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="max_slots" className="text-xs sm:text-sm px-3">
+                      All slots filled
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+              </div>
+
+              <div
+                className="rounded-md border border-border/80 bg-muted/30 p-3 space-y-2 text-xs text-muted-foreground"
+                data-tutorial="server-deployment-transparency"
+              >
+                <p>
+                  <span className="font-medium text-foreground">Power math: </span>
+                  power per server = (module watts per DIMM) × (DIMMs per server). Power budget headroom = your per-server
+                  power cap minus that value.
+                </p>
+                <p>
+                  <span className="font-medium text-foreground">Ranking: </span>
+                  results are sorted by a score that favors more headroom under your power budget and higher data rate
+                  versus the minimum you set. In Optimize mode, a smaller DIMM count can appear above a larger one if it
+                  still meets capacity and scores better on power and rate.
+                </p>
+                <p>
+                  <span className="font-medium text-foreground">Rack view: </span>
+                  each cube is one server at the same memory power as the selected row; total fleet memory power ≈ server
+                  count × power per server (see deployment statistics).
+                </p>
               </div>
 
               <div className="space-y-4" data-tutorial="server-req-fleet">
@@ -329,13 +401,24 @@ export default function ServerDeployment() {
                 <Card className="power-card">
                   <CardHeader>
                     <CardTitle className="text-lg">
-                      Found {configurations.length} Configuration{configurations.length !== 1 ? 's' : ''}
+                      Top picks ({configurations.length}
+                      {totalMatchedCount != null && totalMatchedCount > configurations.length
+                        ? ` of ${totalMatchedCount}`
+                        : ""}
+                      )
                     </CardTitle>
+                    {totalMatchedCount != null && totalMatchedCount > configurations.length ? (
+                      <p className="text-sm font-normal text-muted-foreground leading-snug pt-1">
+                        Showing a short list (up to {SERVER_DEPLOYMENT_RANK_MAX}) of the strongest options with varied
+                        presets and DIMM counts so the choices stay comparable. Relax or tighten filters if you need a
+                        different mix.
+                      </p>
+                    ) : null}
                   </CardHeader>
                   <CardContent className="space-y-2">
                     {configurations.map((config, idx) => (
                       <Card
-                        key={idx}
+                        key={`${config.preset.id}-${config.dimmsPerServer}`}
                         className={`cursor-pointer transition-all ${
                           selectedConfig === config
                             ? "ring-2 ring-primary"
@@ -406,6 +489,22 @@ export default function ServerDeployment() {
 
                       {/* Power Breakdown */}
                       <div className="space-y-2">
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Selected configuration:{" "}
+                          <span className="font-mono text-foreground">
+                            {selectedConfig.powerPerDIMM.toFixed(3)} W/DIMM × {selectedConfig.dimmsPerServer} DIMMs ={" "}
+                            {selectedConfig.powerPerServer.toFixed(3)} W
+                          </span>{" "}
+                          per server.
+                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Power budget headroom:{" "}
+                          <span className="font-mono text-foreground">
+                            {parseFloat(powerBudget).toFixed(1)} W − {selectedConfig.powerPerServer.toFixed(3)} W ={" "}
+                            {(parseFloat(powerBudget) - selectedConfig.powerPerServer).toFixed(3)} W
+                          </span>
+                          .
+                        </p>
                         <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                           <div className="flex items-center gap-2">
                             <Zap className="w-4 h-4 text-power-vdd" />
@@ -495,6 +594,11 @@ export default function ServerDeployment() {
                   </Card>
 
                   {/* 3D Server Farm Visualization */}
+                  <p className="text-xs text-muted-foreground px-1">
+                    Visualization: each block is one server running this memory layout at{" "}
+                    <span className="font-mono text-foreground">{selectedConfig.powerPerServer.toFixed(3)} W</span>{" "}
+                    (memory). Fleet total uses the same value times the server count below.
+                  </p>
                   <ServerRackVisualization
                     numServers={parseInt(numServers) || 0}
                     powerPerServer={selectedConfig.powerPerServer}
@@ -526,19 +630,20 @@ export default function ServerDeployment() {
                         <div>
                           <p className="text-xs text-muted-foreground">Total Power</p>
                           <p className="text-2xl font-bold">
-                            {((parseInt(numServers) || 0) * selectedConfig.powerPerServer / 1000).toFixed(1)} kW
+                            {fleetMemoryPowerKw(parseInt(numServers) || 0, selectedConfig.powerPerServer).toFixed(1)} kW
                           </p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Total Capacity</p>
                           <p className="text-2xl font-bold">
-                            {((parseInt(numServers) || 0) * selectedConfig.totalCapacity / 1024).toFixed(1)} TB
+                            {fleetMemoryCapacityTb(parseInt(numServers) || 0, selectedConfig.totalCapacity).toFixed(1)}{" "}
+                            TB
                           </p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Number of Racks</p>
                           <p className="text-2xl font-bold">
-                            {Math.ceil((parseInt(numServers) || 0) / 42).toLocaleString()}
+                            {rackCountForServers(parseInt(numServers) || 0).toLocaleString()}
                           </p>
                         </div>
                       </div>
