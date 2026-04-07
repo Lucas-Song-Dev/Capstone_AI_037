@@ -104,9 +104,60 @@ export function isApiAvailable(): boolean {
   return Boolean(getApiBase());
 }
 
+/** DDR5 scalar IDD/IPP keys the Python core expects in amperes (see core/src/parser.py). */
+const DDR5_CURRENT_FIELDS = [
+  'idd0',
+  'idd2n',
+  'idd2p',
+  'idd3n',
+  'idd3p',
+  'idd4r',
+  'idd4w',
+  'idd5b',
+  'idd6n',
+  'idd7',
+  'ipp0',
+  'ipp2n',
+  'ipp2p',
+  'ipp3n',
+  'ipp3p',
+  'ipp4r',
+  'ipp4w',
+  'ipp5b',
+  'ipp6n',
+] as const;
+
 /**
- * Shape memspec for FastAPI: `registered` as "true"/"false", `nbrOfDBs` and `nbrOfDevices` set.
- * Mirrors tests/e2e/api_payload.py.
+ * UI presets store DDR5 IDD/IPP in mA (types.ts); the core/parser use SI amperes.
+ * Convert when any “small-current” field looks like mA (> 1). IDD5B is excluded from the
+ * trigger because it can legitimately stay > 1 A after a correct mA→A step (e.g. 10+ A
+ * from bad preset data), which would otherwise cause a second pass to over-scale.
+ */
+const DDR5_MA_TRIGGER_FIELDS = DDR5_CURRENT_FIELDS.filter((k) => k !== 'idd5b');
+
+export function ddr5MempowerspecUiMaToCoreAmps(p: MemSpec['mempowerspec']): MemSpec['mempowerspec'] {
+  const looksLikeMa = DDR5_MA_TRIGGER_FIELDS.some((k) => {
+    const v = p[k as keyof typeof p];
+    return typeof v === 'number' && !Number.isNaN(v) && Math.abs(v) > 1;
+  });
+  if (!looksLikeMa) {
+    return { ...p };
+  }
+  const out: MemSpec['mempowerspec'] = { ...p };
+  const numeric = out as unknown as Record<string, number>;
+  for (const k of DDR5_CURRENT_FIELDS) {
+    const v = numeric[k];
+    if (typeof v === 'number' && !Number.isNaN(v)) {
+      numeric[k] = v / 1000;
+    }
+  }
+  return out;
+}
+
+/**
+ * Shape memspec for FastAPI: `registered` as "true"/"false", `nbrOfDBs` and `nbrOfDevices` set;
+ * DDR5 currents mA → A for the Python core (same as ddr5Calculator `toAmps`).
+ * LPDDR5/X leaves `rails` / `idd_by_rail_A` unchanged (already amperes in app JSON).
  */
 export function normalizeMemspecForApi(memspec: MemSpec): MemSpec {
   const arch = memspec.memarchitecturespec;
@@ -117,9 +168,15 @@ export function normalizeMemspecForApi(memspec: MemSpec): MemSpec {
       : arch.nbrOfBankGroups ?? 8;
   const registered = registeredToBoolean(memspec.registered) ? 'true' : 'false';
 
+  const lpddr = isLpddrMemoryType(memspec.memoryType);
+  const mempowerspec = lpddr
+    ? memspec.mempowerspec
+    : ddr5MempowerspecUiMaToCoreAmps(memspec.mempowerspec);
+
   return {
     ...memspec,
     registered,
+    mempowerspec,
     memarchitecturespec: {
       ...arch,
       nbrOfDevices,

@@ -3,7 +3,12 @@
 import type { ComponentProps, ReactNode } from 'react';
 import Link from 'next/link';
 import { HelpCircle } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  useTooltipStayOpenOnClick,
+} from '@/components/ui/tooltip';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -29,10 +34,18 @@ export function HelpTooltip({
   triggerClassName?: string;
   contentClassName?: string;
 }) {
+  const { open, onOpenChange, triggerProps } = useTooltipStayOpenOnClick();
+
   return (
-    <Tooltip>
+    <Tooltip open={open} onOpenChange={onOpenChange}>
       <TooltipTrigger asChild>
-        <button type="button" className={cn(HELP_TRIGGER_CLASS, triggerClassName)} aria-label={label}>
+        <button
+          type="button"
+          className={cn(HELP_TRIGGER_CLASS, triggerClassName)}
+          aria-label={label}
+          aria-expanded={open}
+          {...triggerProps}
+        >
           <HelpCircle className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors" />
         </button>
       </TooltipTrigger>

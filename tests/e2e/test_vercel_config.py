@@ -65,7 +65,7 @@ def test_api_serverless_entry_exposes_asgi_app() -> None:
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    assert getattr(mod.app, "title", None) == "DDR5 Power Calculator API"
+    assert getattr(mod.app, "title", None) == "DDR5 / LPDDR5 Power Calculator API"
 
 
 def test_api_index_loads_main_by_file_path() -> None:

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   normalizeMemspecForApi,
+  ddr5MempowerspecUiMaToCoreAmps,
   tryApiThenLocalPower,
   coreApiResponseToPowerResult,
   dimmApiResponseToResult,
@@ -164,10 +165,52 @@ describe('normalizeMemspecForApi', () => {
     expect(out.memarchitecturespec.nbrOfDevices).toBe(1);
   });
 
-  it('is stable when called twice', () => {
+  it('is stable when called twice (mA→A only once)', () => {
     const once = normalizeMemspecForApi(baseMemspec());
     const twice = normalizeMemspecForApi(once);
     expect(twice).toEqual(once);
+  });
+
+  it('converts DDR5 IDD/IPP from mA to A for the Python core', () => {
+    const out = normalizeMemspecForApi(baseMemspec());
+    expect(out.mempowerspec.idd3n).toBeCloseTo(0.105, 6);
+    expect(out.mempowerspec.idd5b).toBeCloseTo(10.5, 6);
+    expect(out.mempowerspec.ipp2n).toBeCloseTo(0.0045, 6);
+  });
+
+  it('leaves LPDDR mempowerspec rails / idd_by_rail_A unchanged', () => {
+    const out = normalizeMemspecForApi(lpddrMemspec());
+    expect(out.mempowerspec.idd_by_rail_A?.idd2n?.vdd1).toBe(0.001);
+  });
+});
+
+describe('ddr5MempowerspecUiMaToCoreAmps', () => {
+  it('does not scale values already in amperes', () => {
+    const p = baseMemspec().mempowerspec;
+    const si = {
+      ...p,
+      idd0: 0.05,
+      idd2n: 0.046,
+      idd3n: 0.105,
+      idd4r: 0.21,
+      idd4w: 0.245,
+      idd5b: 10.5,
+      idd6n: 0.046,
+      idd2p: 0.043,
+      idd3p: 0.102,
+      ipp0: 0.005,
+      ipp2n: 0.0045,
+      ipp3n: 0.01,
+      ipp4r: 0.02,
+      ipp4w: 0.025,
+      ipp5b: 1.0,
+      ipp6n: 0.0045,
+      ipp2p: 0.004,
+      ipp3p: 0.0095,
+    };
+    const out = ddr5MempowerspecUiMaToCoreAmps(si);
+    expect(out.idd3n).toBe(0.105);
+    expect(out.idd5b).toBe(10.5);
   });
 });
 
