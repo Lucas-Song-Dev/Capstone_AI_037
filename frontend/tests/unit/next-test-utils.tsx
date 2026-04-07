@@ -10,6 +10,7 @@ import { render, RenderOptions } from '@testing-library/react';
 import { ConfigProvider } from '@/contexts/ConfigContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { ThemeProvider } from '@/components/theme-provider';
 
 /**
  * Custom render function that includes Next.js providers
@@ -25,13 +26,15 @@ function AllTheProviders({ children }: { children: React.ReactNode }) {
   });
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
-        <ConfigProvider>
-          {children}
-        </ConfigProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+          <ConfigProvider>
+            {children}
+          </ConfigProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

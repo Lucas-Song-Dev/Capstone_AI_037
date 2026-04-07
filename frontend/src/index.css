@@ -5,8 +5,60 @@
 @tailwind utilities;
 
 @layer base {
+  /* Light mode — pure white page background */
   :root {
-    /* DDR5 Dark Theme */
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 217 91% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 40%;
+
+    --accent: 142 76% 32%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 88%;
+    --input: 214 32% 88%;
+    --ring: 217 91% 50%;
+
+    --radius: 0.5rem;
+
+    --power-vdd: 217 91% 50%;
+    --power-vpp: 25 95% 48%;
+    --power-read: 142 76% 38%;
+    --power-write: 280 87% 50%;
+    --power-refresh: 48 96% 45%;
+    --power-standby: 215 20% 45%;
+
+    --glow-primary: 0 0 16px hsl(217 91% 50% / 0.25);
+    --glow-accent: 0 0 16px hsl(142 76% 32% / 0.25);
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 217 91% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 214 32% 88%;
+    --sidebar-ring: 217 91% 50%;
+  }
+
+  /* DDR5 dark theme */
+  .dark {
     --background: 222 47% 11%;
     --foreground: 210 40% 98%;
 
@@ -16,31 +68,25 @@
     --popover: 222 47% 20%;
     --popover-foreground: 0 0% 100%;
 
-    /* DDR5 Blue Primary */
     --primary: 217 91% 60%;
     --primary-foreground: 0 0% 98%;
 
-    /* Subtle secondary */
     --secondary: 217 32% 20%;
     --secondary-foreground: 210 40% 98%;
 
     --muted: 217 32% 17%;
     --muted-foreground: 215 20% 65%;
 
-    /* DDR5 Green Accent */
     --accent: 142 76% 36%;
     --accent-foreground: 0 0% 98%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 62% 30%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 217 32% 22%;
     --input: 217 32% 20%;
     --ring: 217 91% 60%;
 
-    --radius: 0.5rem;
-
-    /* Custom power colors */
     --power-vdd: 217 91% 60%;
     --power-vpp: 25 95% 53%;
     --power-read: 142 76% 45%;
@@ -48,11 +94,9 @@
     --power-refresh: 48 96% 53%;
     --power-standby: 215 20% 50%;
 
-    /* Glow effects */
     --glow-primary: 0 0 20px hsl(217 91% 60% / 0.4);
     --glow-accent: 0 0 20px hsl(142 76% 36% / 0.4);
 
-    /* Sidebar */
     --sidebar-background: 222 47% 9%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 217 91% 60%;
@@ -61,28 +105,6 @@
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 217 32% 22%;
     --sidebar-ring: 217 91% 60%;
-  }
-
-  .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 14%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 20%;
-    --popover-foreground: 0 0% 100%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 217 32% 20%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 32% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 142 76% 36%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 32% 22%;
-    --input: 217 32% 20%;
-    --ring: 217 91% 60%;
   }
 }
 
@@ -120,12 +142,20 @@
 
   .power-card {
     @apply relative overflow-hidden rounded-lg border bg-card;
+    background: hsl(var(--card));
+  }
+
+  .dark .power-card {
     background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(222 47% 12%) 100%);
   }
 
   .power-card::before {
     content: '';
     @apply absolute inset-0 opacity-0 transition-opacity duration-300 pointer-events-none;
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.08) 0%, transparent 50%);
+  }
+
+  .dark .power-card::before {
     background: linear-gradient(135deg, hsl(var(--primary) / 0.1) 0%, transparent 50%);
   }
 

@@ -4,6 +4,7 @@ import { useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Text, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
+import { useTheme } from 'next-themes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Box } from 'lucide-react';
 import type { PowerResult, MemSpec } from '@/lib/types';
@@ -161,12 +162,14 @@ export function MemoryDie({
   );
 }
 
-function DDR5Module({ 
-  powerResult, 
-  memspec 
-}: { 
-  powerResult: PowerResult | null; 
+function DDR5Module({
+  powerResult,
+  memspec,
+  titleColor,
+}: {
+  powerResult: PowerResult | null;
   memspec: MemSpec | null;
+  titleColor: string;
 }) {
   const groupRef = useRef<THREE.Group>(null);
 
@@ -230,7 +233,7 @@ function DDR5Module({
       <Text
         position={[0, 1.2, 0]}
         fontSize={0.2}
-        color="#94a3b8"
+        color={titleColor}
         anchorX="center"
         anchorY="middle"
       >
@@ -241,6 +244,13 @@ function DDR5Module({
 }
 
 export function DDR5Chip3D({ powerResult, memspec }: DDR5Chip3DProps) {
+  const { resolvedTheme } = useTheme();
+  const isLight = resolvedTheme === 'light';
+  const canvasBg = isLight ? '#ffffff' : '#111827';
+  const gridPrimary = isLight ? '#94a3b8' : '#1e3a5f';
+  const gridSecondary = isLight ? '#e2e8f0' : '#0f172a';
+  const titleColor = isLight ? '#64748b' : '#94a3b8';
+
   return (
     <Card className="power-card">
       <CardHeader className="!p-4 !pb-2">
@@ -250,19 +260,23 @@ export function DDR5Chip3D({ powerResult, memspec }: DDR5Chip3DProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="!p-0">
-        <div className="h-[300px] w-full">
+        <div className="h-[300px] w-full bg-white dark:bg-transparent">
           <Canvas
             camera={{ position: [4, 3, 4], fov: 45 }}
             gl={{ antialias: true }}
           >
-            <color attach="background" args={['#111827']} />
-            <ambientLight intensity={0.4} />
-            <directionalLight position={[5, 5, 5]} intensity={0.8} />
-            <directionalLight position={[-5, 3, -5]} intensity={0.4} color="#3b82f6" />
-            <pointLight position={[0, 3, 0]} intensity={0.5} color="#10b981" />
-            
-            <DDR5Module powerResult={powerResult} memspec={memspec} />
-            
+            <color attach="background" args={[canvasBg]} />
+            <ambientLight intensity={isLight ? 0.55 : 0.4} />
+            <directionalLight position={[5, 5, 5]} intensity={isLight ? 1.0 : 0.8} />
+            <directionalLight position={[-5, 3, -5]} intensity={isLight ? 0.35 : 0.4} color="#3b82f6" />
+            <pointLight position={[0, 3, 0]} intensity={isLight ? 0.45 : 0.5} color="#10b981" />
+
+            <DDR5Module
+              powerResult={powerResult}
+              memspec={memspec}
+              titleColor={titleColor}
+            />
+
             <OrbitControls
               enablePan={false}
               enableZoom={true}
@@ -272,8 +286,7 @@ export function DDR5Chip3D({ powerResult, memspec }: DDR5Chip3DProps) {
               maxPolarAngle={Math.PI / 2.2}
             />
 
-            {/* Grid floor */}
-            <gridHelper args={[10, 20, '#1e3a5f', '#0f172a']} position={[0, -1, 0]} />
+            <gridHelper args={[10, 20, gridPrimary, gridSecondary]} position={[0, -1, 0]} />
           </Canvas>
         </div>
         

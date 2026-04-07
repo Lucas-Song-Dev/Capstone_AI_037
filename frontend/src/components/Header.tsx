@@ -1,7 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MemoryStick, Github, Info, Settings, Zap, MemoryStick as DIMMIcon, Target, Server } from 'lucide-react';
+import {
+  MemoryStick,
+  Github,
+  Info,
+  Settings,
+  Zap,
+  MemoryStick as DIMMIcon,
+  Target,
+  Server,
+  LayoutGrid,
+} from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { LinkIconTooltip } from '@/components/HelpTooltip';
 import {
@@ -14,6 +24,7 @@ import { ONBOARDING_CONFIGURATION_KEY, isOnboardingComplete } from '@/lib/onboar
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export function Header() {
   const pathname = usePathname();
@@ -103,7 +114,7 @@ export function Header() {
         className={cn(
           'h-8 px-3 text-xs',
           isConfigurationTab
-            ? 'border-white/90 text-white hover:bg-white/10 hover:text-white'
+            ? 'border-primary text-primary hover:bg-primary/10 dark:border-white/90 dark:text-white dark:hover:bg-white/10 dark:hover:text-white'
             : isActive && 'bg-primary/10 text-primary'
         )}
       >
@@ -118,24 +129,27 @@ export function Header() {
   return (
     <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
       <div className="container mx-auto px-4">
-        <div className="h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="relative">
-              <MemoryStick className="w-7 h-7 text-primary" />
-              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-accent rounded-full animate-pulse-glow" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight">
-                DDR5 <span className="gradient-text">Power Calculator</span>
-              </h1>
-              <p className="text-xs text-muted-foreground -mt-0.5">
-                JEDEC-compliant power modeling
-              </p>
-            </div>
-          </Link>
+        <div className="h-14 flex items-center justify-between gap-2 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <ThemeToggle />
+            <Link href="/" className="flex items-center gap-2 sm:gap-3 min-w-0 overflow-hidden">
+              <div className="relative shrink-0">
+                <MemoryStick className="w-7 h-7 text-primary" />
+                <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-accent rounded-full animate-pulse-glow" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-lg font-semibold tracking-tight truncate">
+                  DDR5 <span className="gradient-text">Power Calculator</span>
+                </h1>
+                <p className="text-xs text-muted-foreground -mt-0.5 truncate max-w-[200px] sm:max-w-none">
+                  JEDEC-compliant power modeling
+                </p>
+              </div>
+            </Link>
+          </div>
 
-          <div className="flex items-center gap-2">
-            <nav className="hidden md:flex items-center gap-1 mr-4">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <nav className="hidden md:flex items-center gap-1 mr-2">
               <div className="flex items-center gap-1">
                 {designConfigGroup.map((item) => (
                   <NavButton key={item.path} item={item} />
@@ -148,6 +162,14 @@ export function Header() {
                 ))}
               </div>
             </nav>
+
+            {/* TEMP_POSTER_ENTRY — remove this block with app/poster-summary/ and PosterDimmSummaryCard.tsx */}
+            <Button variant="outline" size="sm" className="h-8 px-2 sm:px-2.5 text-xs shrink-0" asChild>
+              <Link href="/poster-summary" aria-label="Poster summary dashboard (temporary)">
+                <LayoutGrid className="w-3.5 h-3.5 sm:mr-1" />
+                <span className="hidden sm:inline">Poster</span>
+              </Link>
+            </Button>
 
             <LinkIconTooltip
               href="/sources"

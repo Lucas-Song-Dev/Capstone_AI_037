@@ -3,12 +3,25 @@ import { memoryPresets, workloadPresets } from './presets';
 import { computeCorePower, computeDIMMPower, calculateDataRate } from './ddr5Calculator';
 import { isApiAvailable, fetchBatchDIMMPower } from './api';
 
+export type DimmSearchMode = 'optimize' | 'max_slots';
+
 export interface ServerRequirements {
   powerBudgetPerServer: number; // W
   minDataRate: number; // MT/s
   totalCapacity: number; // GB
   workloadType: 'balanced' | 'read_heavy' | 'write_heavy' | 'idle' | 'stress' | 'database_web';
-  dimmsPerServer?: number; // Optional: specify number of DIMM slots
+  dimmsPerServer?: number; // Max DIMM slots per server (also used as fixed count in max_slots mode)
+  /** optimize: try 1..max DIMMs; max_slots: only evaluate all slots filled (fair comparison). */
+  dimmSearchMode?: DimmSearchMode;
+}
+
+/** DIMM counts to evaluate for a given max slot count and search mode. */
+export function dimmCountsForSearchMode(maxDIMMs: number, mode: DimmSearchMode | undefined): number[] {
+  const max = Math.max(1, Math.floor(maxDIMMs));
+  if (mode === 'max_slots') {
+    return [max];
+  }
+  return Array.from({ length: max }, (_, i) => i + 1);
 }
 
 export interface ServerConfiguration {
@@ -29,6 +42,78 @@ export interface ServerConfiguration {
     capacity: boolean;
   };
   score: number; // Higher is better (lower power, higher performance)
+}
+
+/** Typical shortlist size (meaningful tradeoffs, not a long ranked list). */
+export const SERVER_DEPLOYMENT_RANK_TARGET = 5;
+/** Hard cap on rows returned; extra slots only fill when they add preset or DIMM-count variety. */
+export const SERVER_DEPLOYMENT_RANK_MAX = 10;
+
+export interface FindServerConfigurationsResult {
+  rankedConfigurations: ServerConfiguration[];
+  /** All valid configs before trimming to the shortlist. */
+  totalMatched: number;
+}
+
+/**
+ * Reduce a score-sorted list to a small set with varied presets and DIMM counts.
+ * Assumes `sortedDescending` is already sorted by score (high first) and entries are unique per preset+dimms.
+ */
+export function pickDiverseRankedConfigurations(
+  sortedDescending: ServerConfiguration[],
+  options?: { target?: number; max?: number }
+): ServerConfiguration[] {
+  const target = options?.target ?? SERVER_DEPLOYMENT_RANK_TARGET;
+  const max = options?.max ?? SERVER_DEPLOYMENT_RANK_MAX;
+  const n = sortedDescending.length;
+  if (n === 0) return [];
+  if (n <= target) return sortedDescending.slice();
+
+  const picked: ServerConfiguration[] = [];
+  const key = (c: ServerConfiguration) => `${c.preset.id}:${c.dimmsPerServer}`;
+  const pickedKeys = new Set<string>();
+  const presetCount = new Map<string, number>();
+
+  const add = (c: ServerConfiguration) => {
+    const k = key(c);
+    if (pickedKeys.has(k)) return false;
+    picked.push(c);
+    pickedKeys.add(k);
+    presetCount.set(c.preset.id, (presetCount.get(c.preset.id) ?? 0) + 1);
+    return true;
+  };
+
+  for (const c of sortedDescending) {
+    if (picked.length >= max) break;
+    if (pickedKeys.has(key(c))) continue;
+
+    const newPreset = (presetCount.get(c.preset.id) ?? 0) === 0;
+    const dimmsSeen = new Set(picked.map((p) => p.dimmsPerServer));
+    const newDimms = !dimmsSeen.has(c.dimmsPerServer);
+
+    if (picked.length < 3) {
+      add(c);
+      continue;
+    }
+
+    if (picked.length < target) {
+      if (newPreset || newDimms) add(c);
+      continue;
+    }
+
+    if (picked.length < max && (newPreset || newDimms)) {
+      add(c);
+    }
+  }
+
+  if (picked.length < target) {
+    for (const c of sortedDescending) {
+      if (picked.length >= target) break;
+      add(c);
+    }
+  }
+
+  return picked;
 }
 
 // Database/web mixed workload (typical for data centers)
@@ -55,14 +140,14 @@ function getWorkload(workloadType: ServerRequirements['workloadType']): Workload
   return preset?.workload || workloadPresets[0].workload;
 }
 
-function buildServerConfiguration(
+export function buildServerConfiguration(
   preset: MemoryPreset,
   requirements: ServerRequirements,
   dimmsPerServer: number,
   workload: Workload,
   powerResult: PowerResult,
   dimmPowerResult: DIMMPowerResult
-): ServerConfiguration | null {
+): ServerConfiguration {
   const dimmCapacityGB = parseFloat(preset.capacity);
   
   // Calculate total server power
@@ -146,9 +231,11 @@ async function powerForAllPresets(
 /** Uses Python core via batch API when NEXT_PUBLIC_API_URL is set; otherwise the JS port. */
 export async function findServerConfigurations(
   requirements: ServerRequirements
-): Promise<ServerConfiguration[]> {
+): Promise<FindServerConfigurationsResult> {
   const configurations: ServerConfiguration[] = [];
   const maxDIMMs = requirements.dimmsPerServer || 8;
+  const mode: DimmSearchMode = requirements.dimmSearchMode ?? 'optimize';
+  const dimmIterations = dimmCountsForSearchMode(maxDIMMs, mode);
   const workload = getWorkload(requirements.workloadType);
   const powerByPreset = await powerForAllPresets(workload);
 
@@ -157,7 +244,7 @@ export async function findServerConfigurations(
     if (!entry) continue;
     const { powerResult, dimmPowerResult } = entry;
 
-    for (let dimms = 1; dimms <= maxDIMMs; dimms++) {
+    for (const dimms of dimmIterations) {
       const config = buildServerConfiguration(
         preset,
         requirements,
@@ -168,7 +255,6 @@ export async function findServerConfigurations(
       );
 
       if (
-        config &&
         config.meetsRequirements.power &&
         config.meetsRequirements.performance &&
         config.meetsRequirements.capacity
@@ -179,7 +265,12 @@ export async function findServerConfigurations(
   }
 
   configurations.sort((a, b) => b.score - a.score);
-  return configurations;
+  const totalMatched = configurations.length;
+  const rankedConfigurations =
+    totalMatched <= SERVER_DEPLOYMENT_RANK_MAX
+      ? configurations.slice()
+      : pickDiverseRankedConfigurations(configurations);
+  return { rankedConfigurations, totalMatched };
 }
 
 export function formatServerSummary(config: ServerConfiguration): string {

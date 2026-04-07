@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Header } from "@/components/Header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,19 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, Zap, MemoryStick, Gauge, Server } from "lucide-react";
 import { HelpTooltip } from "@/components/HelpTooltip";
-import { findServerConfigurations, formatServerSummary, type ServerRequirements, type ServerConfiguration } from "@/lib/serverDeployment";
+import {
+  findServerConfigurations,
+  SERVER_DEPLOYMENT_RANK_MAX,
+  type ServerRequirements,
+  type ServerConfiguration,
+  type DimmSearchMode,
+} from "@/lib/serverDeployment";
+import {
+  fleetMemoryPowerKw,
+  fleetMemoryCapacityTb,
+  rackCountForServers,
+} from "@/lib/serverDeploymentMetrics";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PowerBreakdownChart, TotalPowerDisplay } from "@/components/PowerChart";
 import { ServerRackVisualization } from "@/components/ServerRackVisualization";
 import { useConfig } from "@/contexts/ConfigContext";
@@ -26,28 +38,55 @@ import { SpotlightTutorial } from "@/components/SpotlightTutorial";
 import { SERVER_DEPLOYMENT_TUTORIAL_STEPS } from "@/config/spotlight-page-steps";
 import { ONBOARDING_SERVER_DEPLOYMENT_KEY } from "@/lib/onboarding-storage";
 import { DescriptionWithTooltip } from "@/components/DescriptionTooltip";
+import { cn } from "@/lib/utils";
 
 const SERVER_DEPLOYMENT_INTRO =
   "Search memory presets against power, bandwidth, and capacity limits you set. Ranked results favor efficient configs that still meet every constraint. Pick a row to inspect power charts and rack-scale totals before sending the memspec back to Configuration.";
+
+/** Converts a fleet total memory power budget (W) into a per-server cap for matching (same as disabled server-count field in total-budget mode). */
+const TOTAL_BUDGET_REFERENCE_SERVERS = 100;
+
+type PowerBudgetMode = 'per_server' | 'total_fleet';
 
 export default function ServerDeployment() {
   const { setMemspec, setWorkload } = useConfig();
   const router = useRouter();
   
+  const [powerBudgetMode, setPowerBudgetMode] = useState<PowerBudgetMode>('per_server');
   const [powerBudget, setPowerBudget] = useState<string>("100");
   const [minDataRate, setMinDataRate] = useState<string>("4800");
   const [totalCapacity, setTotalCapacity] = useState<string>("128");
   const [workloadType, setWorkloadType] = useState<ServerRequirements['workloadType']>("database_web");
   const [maxDIMMs, setMaxDIMMs] = useState<string>("8");
+  const [dimmSearchMode, setDimmSearchMode] = useState<DimmSearchMode>("optimize");
   const [numServers, setNumServers] = useState<string>("100");
   const [configurations, setConfigurations] = useState<ServerConfiguration[]>([]);
+  const [totalMatchedCount, setTotalMatchedCount] = useState<number | null>(null);
   const [selectedConfig, setSelectedConfig] = useState<ServerConfiguration | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const effectivePerServerBudgetW = useMemo(() => {
+    const v = parseFloat(powerBudget);
+    if (!Number.isFinite(v) || v <= 0) return 0;
+    return powerBudgetMode === 'total_fleet' ? v / TOTAL_BUDGET_REFERENCE_SERVERS : v;
+  }, [powerBudget, powerBudgetMode]);
+
+  /** Fleet size for stats and (full) planning: under total-fleet mode = max homogeneous servers within total memory power budget. */
+  const fleetServerCountForViz = useMemo(() => {
+    if (powerBudgetMode === 'per_server') {
+      return Math.max(0, parseInt(numServers, 10) || 0);
+    }
+    if (!selectedConfig) return 0;
+    const totalW = parseFloat(powerBudget);
+    if (!Number.isFinite(totalW) || totalW <= 0 || selectedConfig.powerPerServer <= 0) return 0;
+    return Math.min(1_000_000, Math.floor(totalW / selectedConfig.powerPerServer));
+  }, [powerBudgetMode, numServers, powerBudget, selectedConfig]);
+
   const handleSearch = async () => {
     setError(null);
     setSelectedConfig(null);
+    setTotalMatchedCount(null);
 
     const powerBudgetNum = parseFloat(powerBudget);
     const minDataRateNum = parseFloat(minDataRate);
@@ -55,7 +94,11 @@ export default function ServerDeployment() {
     const maxDIMMsNum = parseInt(maxDIMMs);
 
     if (!Number.isFinite(powerBudgetNum) || powerBudgetNum <= 0) {
-      setError("Power budget must be a positive number");
+      setError(
+        powerBudgetMode === 'total_fleet'
+          ? "Total memory power budget must be a positive number"
+          : "Power budget per server must be a positive number"
+      );
       return;
     }
 
@@ -74,30 +117,39 @@ export default function ServerDeployment() {
       return;
     }
 
-    const numServersNum = parseFloat(numServers);
-    if (!Number.isFinite(numServersNum) || numServersNum < 1 || numServersNum > 1000000) {
-      setError("Number of servers must be between 1 and 1,000,000");
-      return;
+    if (powerBudgetMode === 'per_server') {
+      const numServersNum = parseFloat(numServers);
+      if (!Number.isFinite(numServersNum) || numServersNum < 1 || numServersNum > 1000000) {
+        setError("Number of servers must be between 1 and 1,000,000");
+        return;
+      }
     }
 
     setLoading(true);
 
     try {
+      const powerBudgetPerServer =
+        powerBudgetMode === 'total_fleet'
+          ? powerBudgetNum / TOTAL_BUDGET_REFERENCE_SERVERS
+          : powerBudgetNum;
+
       const requirements: ServerRequirements = {
-        powerBudgetPerServer: powerBudgetNum,
+        powerBudgetPerServer,
         minDataRate: minDataRateNum,
         totalCapacity: totalCapacityNum,
         workloadType,
         dimmsPerServer: maxDIMMsNum,
+        dimmSearchMode,
       };
 
-      const results = await findServerConfigurations(requirements);
+      const { rankedConfigurations, totalMatched } = await findServerConfigurations(requirements);
 
-      if (results.length === 0) {
+      if (rankedConfigurations.length === 0) {
         setError("No configurations found that meet all requirements. Try relaxing constraints.");
       } else {
-        setConfigurations(results);
-        setSelectedConfig(results[0]);
+        setConfigurations(rankedConfigurations);
+        setTotalMatchedCount(totalMatched);
+        setSelectedConfig(rankedConfigurations[0]);
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to find configurations");
@@ -136,23 +188,74 @@ export default function ServerDeployment() {
               <DescriptionWithTooltip
                 variant="card"
                 label="Requirements card"
-                text="Enter numeric limits for power, data rate, capacity, DIMM slots, server count, and workload. The designer scores presets that satisfy all constraints. You can relax inputs and search again if nothing matches."
+                text="Enter power (per server or total fleet), data rate, capacity, DIMM slots, optional server count (per-server mode), and workload. The designer scores presets that satisfy all constraints. You can relax inputs and search again if nothing matches."
               />
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-tutorial="server-req-hardware">
+                <div className="space-y-2 md:col-span-2">
+                  <div className="flex items-center gap-2">
+                    <Label>Memory power budget</Label>
+                    <HelpTooltip label="Help: budget scope">
+                      <p className="text-sm">
+                        <strong>Per server:</strong> cap memory draw for each box; enter how many servers for fleet totals
+                        and the rack view.
+                        <br />
+                        <br />
+                        <strong>Total fleet:</strong> cap combined memory power for the whole deployment (watts). Search
+                        uses total ÷ {TOTAL_BUDGET_REFERENCE_SERVERS} as an equivalent per-server limit. After you pick a
+                        row, server count is estimated as how many identical servers fit under your total at that memory
+                        power.
+                      </p>
+                    </HelpTooltip>
+                  </div>
+                  <ToggleGroup
+                    type="single"
+                    value={powerBudgetMode}
+                    onValueChange={(v) => {
+                      if (v === "per_server" || v === "total_fleet") setPowerBudgetMode(v);
+                    }}
+                    variant="outline"
+                    className="flex flex-wrap justify-start gap-1"
+                  >
+                    <ToggleGroupItem value="per_server" className="text-xs sm:text-sm px-3">
+                      Per server (W)
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="total_fleet" className="text-xs sm:text-sm px-3">
+                      Total fleet (W)
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="power-budget">
-                      Power Budget per Server (W)
+                      {powerBudgetMode === "total_fleet"
+                        ? "Total memory power budget (W)"
+                        : "Memory power budget per server (W)"}
                     </Label>
-                    <HelpTooltip label="Help: power budget per server">
+                    <HelpTooltip
+                      label={
+                        powerBudgetMode === "total_fleet"
+                          ? "Help: total memory power budget"
+                          : "Help: power budget per server"
+                      }
+                    >
                       <p className="text-sm">
-                        <strong>How much electricity can the memory use?</strong><br />
-                        Like a light bulb that can only use so much power, your server has a limit. 
-                        This is the maximum amount of electricity (in Watts) that all the memory 
-                        in one server is allowed to use. Lower numbers mean less power, which saves 
-                        money and keeps things cooler!
+                        {powerBudgetMode === "total_fleet" ? (
+                          <>
+                            <strong>Combined memory power envelope</strong> for every server together (watts). Example:
+                            10 kW for all memory in the fleet. The designer converts this to a per-server matching cap
+                            using ÷ {TOTAL_BUDGET_REFERENCE_SERVERS} servers, then ranks DIMM configs that stay under that
+                            per-server limit.
+                          </>
+                        ) : (
+                          <>
+                            <strong>Per-server memory power ceiling (W).</strong> All populated DIMMs on that node are
+                            modeled together; their combined draw must stay at or under this cap. Lower values exclude
+                            higher-power module or fill combinations.
+                          </>
+                        )}
                       </p>
                     </HelpTooltip>
                   </div>
@@ -162,8 +265,17 @@ export default function ServerDeployment() {
                     step="0.1"
                     value={powerBudget}
                     onChange={(e) => setPowerBudget(e.target.value)}
-                    placeholder="25"
+                    placeholder={powerBudgetMode === "total_fleet" ? "10000" : "100"}
                   />
+                  {powerBudgetMode === "total_fleet" ? (
+                    <p className="text-xs text-muted-foreground">
+                      Matching uses {TOTAL_BUDGET_REFERENCE_SERVERS} servers as reference:{" "}
+                      <span className="font-mono">
+                        {effectivePerServerBudgetW > 0 ? `${effectivePerServerBudgetW.toFixed(3)} W` : "—"}
+                      </span>{" "}
+                      per server cap (adjust total budget to tighten or loosen).
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-2">
@@ -173,11 +285,9 @@ export default function ServerDeployment() {
                     </Label>
                     <HelpTooltip label="Help: minimum data rate">
                       <p className="text-sm">
-                        <strong>How fast should the memory be?</strong><br />
-                        Think of this like the speed limit on a highway. The memory needs to be 
-                        at least this fast (measured in millions of transfers per second). 
-                        Higher numbers mean faster memory, which helps your server work quicker. 
-                        Like a race car vs a regular car!
+                        <strong>Minimum effective data rate (MT/s).</strong> Presets whose timing-derived data rate
+                        falls below this threshold are rejected. Align with the speed grade you are willing to deploy;
+                        the tool does not assume overclocking beyond what each memspec supports.
                       </p>
                     </HelpTooltip>
                   </div>
@@ -198,10 +308,9 @@ export default function ServerDeployment() {
                     </Label>
                     <HelpTooltip label="Help: total memory capacity">
                       <p className="text-sm">
-                        <strong>How much memory do you need?</strong><br />
-                        This is like the size of a backpack - how much stuff (data) can it hold? 
-                        More GB (gigabytes) means more space to store information. If you need to 
-                        remember lots of things at once, you need a bigger backpack!
+                        <strong>Minimum aggregate DRAM capacity per server (GB).</strong> Installed capacity is DIMM
+                        density × populated slot count; configurations that clear this bar are kept. Use the minimum you
+                        need for working set / VM footprint, not raw DIMM sticker size alone.
                       </p>
                     </HelpTooltip>
                   </div>
@@ -222,11 +331,9 @@ export default function ServerDeployment() {
                     </Label>
                     <HelpTooltip label="Help: maximum DIMM slots">
                       <p className="text-sm">
-                        <strong>How many memory sticks can fit?</strong><br />
-                        A DIMM is like a memory stick (like a USB stick, but for memory). 
-                        Your server has slots where you can plug in these sticks. This number 
-                        tells us the maximum number of slots available. More slots means you 
-                        can add more memory sticks!
+                        <strong>Maximum populated DIMM slots per server.</strong> Bounds the search: Optimize sweeps
+                        1…max; All slots filled evaluates only the fully populated case. Should match your board /
+                        CPU memory architecture (channel layout still uses a simple packing heuristic in the summary).
                       </p>
                     </HelpTooltip>
                   </div>
@@ -241,21 +348,97 @@ export default function ServerDeployment() {
                     placeholder="8"
                   />
                 </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <div className="flex items-center gap-2">
+                    <Label>DIMM search mode</Label>
+                    <HelpTooltip label="Help: DIMM search mode">
+                      <p className="text-sm">
+                        <strong>Optimize</strong> tries every DIMM count from 1 up to your maximum slots and keeps
+                        configs that meet your targets—fewer DIMMs can rank higher when they still satisfy capacity
+                        because memory power is lower.
+                        <br />
+                        <br />
+                        <strong>All slots filled</strong> only evaluates fully populated servers (DIMMs = max slots) so
+                        you compare presets on equal footing for &quot;fleet at full memory fill&quot; planning.
+                      </p>
+                    </HelpTooltip>
+                  </div>
+                  <ToggleGroup
+                    type="single"
+                    value={dimmSearchMode}
+                    onValueChange={(v) => {
+                      if (v === "optimize" || v === "max_slots") setDimmSearchMode(v);
+                    }}
+                    variant="outline"
+                    className="flex flex-wrap justify-start gap-1"
+                  >
+                    <ToggleGroupItem value="optimize" className="text-xs sm:text-sm px-3">
+                      Optimize (1–max slots)
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="max_slots" className="text-xs sm:text-sm px-3">
+                      All slots filled
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+              </div>
+
+              <div
+                className="rounded-md border border-border/80 bg-muted/30 p-3 space-y-2 text-xs text-muted-foreground"
+                data-tutorial="server-deployment-transparency"
+              >
+                <p>
+                  <span className="font-medium text-foreground">Power math: </span>
+                  power per server = (module watts per DIMM) × (DIMMs per server). With a{" "}
+                  <strong>per-server</strong> budget, headroom is that cap minus memory draw per box. With a{" "}
+                  <strong>total fleet</strong> budget (W), search uses total ÷ {TOTAL_BUDGET_REFERENCE_SERVERS} as the
+                  per-server matching cap; after you pick a row, fleet size is estimated as how many servers fit under
+                  your total at that memory power.
+                </p>
+                <p>
+                  <span className="font-medium text-foreground">Ranking: </span>
+                  results are sorted by a score that favors more headroom under your power budget and higher data rate
+                  versus the minimum you set. In Optimize mode, a smaller DIMM count can appear above a larger one if it
+                  still meets capacity and scores better on power and rate.
+                </p>
+                <p>
+                  <span className="font-medium text-foreground">Rack view: </span>
+                  each cube is one server at the same memory power as the selected row; total fleet memory power ≈ server
+                  count × power per server (see deployment statistics).
+                </p>
               </div>
 
               <div className="space-y-4" data-tutorial="server-req-fleet">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
+                <div
+                  className={cn(
+                    "space-y-2 transition-opacity",
+                    powerBudgetMode === "total_fleet" && "opacity-60"
+                  )}
+                >
                   <div className="flex items-center gap-2">
                     <Label htmlFor="num-servers">
                       Number of Servers
+                      {powerBudgetMode === "total_fleet" ? (
+                        <span className="text-muted-foreground font-normal"> (from total budget)</span>
+                      ) : null}
                     </Label>
                     <HelpTooltip label="Help: number of servers">
                       <p className="text-sm">
-                        <strong>How many servers do you need?</strong><br />
-                        Enter the total number of servers in your deployment. 
-                        Supports large-scale deployments up to 1,000,000 servers. 
-                        The visualization will show server racks with cubes representing each server.
+                        {powerBudgetMode === "total_fleet" ? (
+                          <>
+                            <strong>Estimated from your total budget</strong> after you select a configuration:{" "}
+                            <code>floor(total W ÷ memory W per server)</code> (0 if a single server exceeds the budget),
+                            capped at 1,000,000. This field is not
+                            editable in total-fleet mode; switch to per-server budget to type a server count directly.
+                          </>
+                        ) : (
+                          <>
+                            <strong>Fleet size (nodes).</strong> Drives aggregate fleet memory power (kW), installed
+                            memory (TB), rack count (42-server racks), and the 3D rack view. Independent of the per-server
+                            power constraint logic; enter your expected deployment scale (1–1,000,000).
+                          </>
+                        )}
                       </p>
                     </HelpTooltip>
                   </div>
@@ -265,9 +448,23 @@ export default function ServerDeployment() {
                     step="1"
                     min="1"
                     max="1000000"
-                    value={numServers}
-                    onChange={(e) => setNumServers(e.target.value)}
-                    placeholder="100"
+                    disabled={powerBudgetMode === "total_fleet"}
+                    readOnly={powerBudgetMode === "total_fleet"}
+                    value={
+                      powerBudgetMode === "total_fleet"
+                        ? selectedConfig
+                          ? String(fleetServerCountForViz)
+                          : ""
+                        : numServers
+                    }
+                    onChange={(e) => {
+                      if (powerBudgetMode === "per_server") setNumServers(e.target.value);
+                    }}
+                    placeholder={
+                      powerBudgetMode === "total_fleet"
+                        ? "Select a configuration"
+                        : "100"
+                    }
                   />
                 </div>
 
@@ -276,11 +473,10 @@ export default function ServerDeployment() {
                     <Label htmlFor="workload-type">Workload Type</Label>
                     <HelpTooltip label="Help: workload type">
                       <p className="text-sm">
-                        <strong>What will your server be doing?</strong><br />
-                        This is like asking: will you be reading books, writing stories, or both? 
-                        Different jobs use memory differently. Some read a lot (like looking up 
-                        information), some write a lot (like saving new data), and some do both 
-                        equally. Pick the one that matches what your server will do most!
+                        <strong>Workload / command-mix preset.</strong> Sets the activity percentages (bank states,
+                        reads, writes, refresh contribution, etc.) in the workload JSON passed into the power model.
+                        Choose the profile closest to your traffic; tune the full workload on Configuration if you need
+                        a custom mix.
                       </p>
                     </HelpTooltip>
                   </div>
@@ -329,13 +525,24 @@ export default function ServerDeployment() {
                 <Card className="power-card">
                   <CardHeader>
                     <CardTitle className="text-lg">
-                      Found {configurations.length} Configuration{configurations.length !== 1 ? 's' : ''}
+                      Top picks ({configurations.length}
+                      {totalMatchedCount != null && totalMatchedCount > configurations.length
+                        ? ` of ${totalMatchedCount}`
+                        : ""}
+                      )
                     </CardTitle>
+                    {totalMatchedCount != null && totalMatchedCount > configurations.length ? (
+                      <p className="text-sm font-normal text-muted-foreground leading-snug pt-1">
+                        Showing a short list (up to {SERVER_DEPLOYMENT_RANK_MAX}) of the strongest options with varied
+                        presets and DIMM counts so the choices stay comparable. Relax or tighten filters if you need a
+                        different mix.
+                      </p>
+                    ) : null}
                   </CardHeader>
                   <CardContent className="space-y-2">
                     {configurations.map((config, idx) => (
                       <Card
-                        key={idx}
+                        key={`${config.preset.id}-${config.dimmsPerServer}`}
                         className={`cursor-pointer transition-all ${
                           selectedConfig === config
                             ? "ring-2 ring-primary"
@@ -406,6 +613,35 @@ export default function ServerDeployment() {
 
                       {/* Power Breakdown */}
                       <div className="space-y-2">
+                        {powerBudgetMode === "total_fleet" ? (
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Total memory budget:{" "}
+                            <span className="font-mono text-foreground">
+                              {(parseFloat(powerBudget) || 0).toFixed(1)} W
+                            </span>
+                            . Matching cap:{" "}
+                            <span className="font-mono text-foreground">
+                              {effectivePerServerBudgetW.toFixed(3)} W
+                            </span>{" "}
+                            per server (total ÷ {TOTAL_BUDGET_REFERENCE_SERVERS}).
+                          </p>
+                        ) : null}
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Selected configuration:{" "}
+                          <span className="font-mono text-foreground">
+                            {selectedConfig.powerPerDIMM.toFixed(3)} W/DIMM × {selectedConfig.dimmsPerServer} DIMMs ={" "}
+                            {selectedConfig.powerPerServer.toFixed(3)} W
+                          </span>{" "}
+                          per server.
+                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Per-server budget headroom (matching cap):{" "}
+                          <span className="font-mono text-foreground">
+                            {effectivePerServerBudgetW.toFixed(3)} W − {selectedConfig.powerPerServer.toFixed(3)} W ={" "}
+                            {(effectivePerServerBudgetW - selectedConfig.powerPerServer).toFixed(3)} W
+                          </span>
+                          .
+                        </p>
                         <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                           <div className="flex items-center gap-2">
                             <Zap className="w-4 h-4 text-power-vdd" />
@@ -423,21 +659,23 @@ export default function ServerDeployment() {
                         <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                           <div className="flex items-center gap-2">
                             <Gauge className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">Power Budget</span>
+                            <span className="text-sm font-medium">
+                              {powerBudgetMode === "total_fleet" ? "Matching cap / server" : "Power budget / server"}
+                            </span>
                           </div>
-                          <span className="font-bold">{parseFloat(powerBudget).toFixed(1)} W</span>
+                          <span className="font-bold">{effectivePerServerBudgetW.toFixed(3)} W</span>
                         </div>
                         <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                           <div className="flex items-center gap-2">
                             <MemoryStick className="w-4 h-4 text-accent" />
-                            <span className="text-sm font-medium">Remaining Budget</span>
+                            <span className="text-sm font-medium">Remaining (per server)</span>
                           </div>
                           <span className={`font-bold ${
-                            parseFloat(powerBudget) - selectedConfig.powerPerServer >= 0
+                            effectivePerServerBudgetW - selectedConfig.powerPerServer >= 0
                               ? "text-green-600"
                               : "text-red-600"
                           }`}>
-                            {(parseFloat(powerBudget) - selectedConfig.powerPerServer).toFixed(3)} W
+                            {(effectivePerServerBudgetW - selectedConfig.powerPerServer).toFixed(3)} W
                           </span>
                         </div>
                       </div>
@@ -495,8 +733,23 @@ export default function ServerDeployment() {
                   </Card>
 
                   {/* 3D Server Farm Visualization */}
+                  <p className="text-xs text-muted-foreground px-1">
+                    Visualization: each block is one server at{" "}
+                    <span className="font-mono text-foreground">{selectedConfig.powerPerServer.toFixed(3)} W</span>{" "}
+                    memory.
+                    {powerBudgetMode === "total_fleet" ? (
+                      <>
+                        {" "}
+                        Count = max servers that fit under your{" "}
+                        <span className="font-mono text-foreground">{(parseFloat(powerBudget) || 0).toFixed(1)} W</span>{" "}
+                        total memory budget.
+                      </>
+                    ) : (
+                      <> Fleet totals use this power times the server count you entered.</>
+                    )}
+                  </p>
                   <ServerRackVisualization
-                    numServers={parseInt(numServers) || 0}
+                    numServers={fleetServerCountForViz}
                     powerPerServer={selectedConfig.powerPerServer}
                     selectedConfig={{
                       dimmsPerServer: selectedConfig.dimmsPerServer,
@@ -521,24 +774,24 @@ export default function ServerDeployment() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
                           <p className="text-xs text-muted-foreground">Total Servers</p>
-                          <p className="text-2xl font-bold">{(parseInt(numServers) || 0).toLocaleString()}</p>
+                          <p className="text-2xl font-bold">{fleetServerCountForViz.toLocaleString()}</p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Total Power</p>
                           <p className="text-2xl font-bold">
-                            {((parseInt(numServers) || 0) * selectedConfig.powerPerServer / 1000).toFixed(1)} kW
+                            {fleetMemoryPowerKw(fleetServerCountForViz, selectedConfig.powerPerServer).toFixed(1)} kW
                           </p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Total Capacity</p>
                           <p className="text-2xl font-bold">
-                            {((parseInt(numServers) || 0) * selectedConfig.totalCapacity / 1024).toFixed(1)} TB
+                            {fleetMemoryCapacityTb(fleetServerCountForViz, selectedConfig.totalCapacity).toFixed(1)} TB
                           </p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Number of Racks</p>
                           <p className="text-2xl font-bold">
-                            {Math.ceil((parseInt(numServers) || 0) / 42).toLocaleString()}
+                            {rackCountForServers(fleetServerCountForViz).toLocaleString()}
                           </p>
                         </div>
                       </div>

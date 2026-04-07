@@ -4,7 +4,14 @@ import { useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Text } from '@react-three/drei';
 import * as THREE from 'three';
+import { useTheme } from 'next-themes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+import {
+  fleetMemoryPowerKw,
+  rackCountForServers,
+  SERVERS_PER_STANDARD_RACK as SERVERS_PER_RACK,
+} from '@/lib/serverDeploymentMetrics';
 
 interface ServerRackVisualizationProps {
   numServers: number;
@@ -18,12 +25,13 @@ interface ServerRackVisualizationProps {
 }
 
 // Constants for visualization
-const SERVERS_PER_RACK = 42; // Standard rack units
 const RACK_WIDTH = 2;
 const RACK_DEPTH = 1;
 const RACK_HEIGHT = 2;
 const SERVER_HEIGHT = 0.04; // Height of each server unit
 const SPACING = 0.1;
+/** Must match ServerFarm cap so on-card stats match cubes drawn. */
+const MAX_RACKS_IN_SCENE = 100;
 
 function ServerCube({ 
   position, 
@@ -100,18 +108,20 @@ function ServerCube({
   );
 }
 
-function Rack({ 
-  position, 
-  serversInRack, 
+function Rack({
+  position,
+  serversInRack,
   powerPerServer,
   rackIndex,
-  startServerIndex 
-}: { 
-  position: [number, number, number]; 
+  startServerIndex,
+  labelColor,
+}: {
+  position: [number, number, number];
   serversInRack: number;
   powerPerServer: number;
   rackIndex: number;
   startServerIndex: number;
+  labelColor: string;
 }) {
   const rackRef = useRef<THREE.Group>(null);
   
@@ -158,7 +168,7 @@ function Rack({
         <Text
           position={[0, RACK_HEIGHT + 0.2, 0]}
           fontSize={0.15}
-          color="white"
+          color={labelColor}
           anchorX="center"
           anchorY="middle"
         >
@@ -169,16 +179,18 @@ function Rack({
   );
 }
 
-function ServerFarm({ 
-  numServers, 
-  powerPerServer 
-}: { 
-  numServers: number; 
+function ServerFarm({
+  numServers,
+  powerPerServer,
+  isLight,
+}: {
+  numServers: number;
   powerPerServer: number;
+  isLight: boolean;
 }) {
-  const numRacks = Math.ceil(numServers / SERVERS_PER_RACK);
+  const numRacks = rackCountForServers(numServers, SERVERS_PER_RACK);
   // Limit visualization to reasonable number for performance
-  const maxRacksToRender = 100;
+  const maxRacksToRender = MAX_RACKS_IN_SCENE;
   const racksToRender = Math.min(numRacks, maxRacksToRender);
   const racksPerRow = Math.ceil(Math.sqrt(racksToRender));
   
@@ -207,6 +219,7 @@ function ServerFarm({
             powerPerServer={powerPerServer}
             rackIndex={idx}
             startServerIndex={startServerIndex}
+            labelColor={isLight ? '#1e293b' : 'white'}
           />
         );
       })}
@@ -214,7 +227,7 @@ function ServerFarm({
       {/* Ground plane */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]}>
         <planeGeometry args={[racksPerRow * (RACK_WIDTH + 1) * 2, Math.ceil(racksToRender / racksPerRow) * (RACK_DEPTH + 1) * 2]} />
-        <meshStandardMaterial color="#1a1a1a" />
+        <meshStandardMaterial color={isLight ? '#f1f5f9' : '#1a1a1a'} />
       </mesh>
       
       {/* Info text if rendering is limited */}
@@ -230,55 +243,95 @@ function ServerFarm({
         </Text>
       )}
       
-      {/* Lighting */}
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[10, 10, 5]} intensity={0.8} />
-      <pointLight position={[-10, 10, -10]} intensity={0.5} />
+      <ambientLight intensity={isLight ? 0.65 : 0.4} />
+      <directionalLight position={[10, 10, 5]} intensity={isLight ? 0.95 : 0.8} />
+      <pointLight position={[-10, 10, -10]} intensity={isLight ? 0.45 : 0.5} />
     </>
   );
 }
 
-export function ServerRackVisualization({ 
-  numServers, 
+export function ServerRackVisualization({
+  numServers,
   powerPerServer,
-  selectedConfig 
+  selectedConfig,
 }: ServerRackVisualizationProps) {
-  const totalPower = numServers * powerPerServer;
-  const numRacks = Math.ceil(numServers / SERVERS_PER_RACK);
-  
+  const { resolvedTheme } = useTheme();
+  const isLight = resolvedTheme === 'light';
+  const numRacksTotal = rackCountForServers(numServers, SERVERS_PER_RACK);
+  const maxServersInScene = MAX_RACKS_IN_SCENE * SERVERS_PER_RACK;
+  const serversInScene = Math.min(Math.max(0, numServers), maxServersInScene);
+  const sceneTruncated = numServers > serversInScene;
+  const powerKwScene = fleetMemoryPowerKw(serversInScene, powerPerServer);
+  const powerKwFleet = fleetMemoryPowerKw(numServers, powerPerServer);
+  const canvasBg = isLight ? '#ffffff' : '#000000';
+
   return (
     <Card className="power-card">
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
+        <CardTitle className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <span>Server Farm Visualization</span>
-          <div className="text-sm font-normal text-muted-foreground">
-            {numServers.toLocaleString()} servers • {numRacks} rack{numRacks !== 1 ? 's' : ''}
+          <div className="text-sm font-normal text-muted-foreground text-right sm:text-left">
+            {sceneTruncated ? (
+              <span>
+                <span className="text-foreground font-medium tabular-nums">
+                  {serversInScene.toLocaleString()}
+                </span>{" "}
+                servers drawn ·{" "}
+                <span className="tabular-nums">{numServers.toLocaleString()}</span> fleet ·{" "}
+                {numRacksTotal} rack{numRacksTotal !== 1 ? "s" : ""} ({MAX_RACKS_IN_SCENE} rack
+                {MAX_RACKS_IN_SCENE !== 1 ? "s" : ""} max in view)
+              </span>
+            ) : (
+              <span>
+                {numServers.toLocaleString()} server{numServers !== 1 ? "s" : ""} · {numRacksTotal} rack
+                {numRacksTotal !== 1 ? "s" : ""}
+              </span>
+            )}
           </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {/* Stats */}
+          {/* Stats — match what is actually rendered when the scene is capped */}
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
-              <p className="text-muted-foreground">Total Servers</p>
-              <p className="text-2xl font-bold">{numServers.toLocaleString()}</p>
+              <p className="text-muted-foreground">Servers in view</p>
+              <p className="text-2xl font-bold tabular-nums">{serversInScene.toLocaleString()}</p>
+              {sceneTruncated ? (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Fleet total {numServers.toLocaleString()}
+                </p>
+              ) : null}
             </div>
             <div>
-              <p className="text-muted-foreground">Total Power</p>
-              <p className="text-2xl font-bold">{(totalPower / 1000).toFixed(1)} kW</p>
+              <p className="text-muted-foreground">Power in view</p>
+              <p className="text-2xl font-bold tabular-nums">{powerKwScene.toFixed(1)} kW</p>
+              {sceneTruncated ? (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Fleet {powerKwFleet.toFixed(1)} kW
+                </p>
+              ) : null}
             </div>
             <div>
-              <p className="text-muted-foreground">Power/Server</p>
-              <p className="text-2xl font-bold">{powerPerServer.toFixed(1)} W</p>
+              <p className="text-muted-foreground">Power / server</p>
+              <p className="text-2xl font-bold tabular-nums">{powerPerServer.toFixed(1)} W</p>
             </div>
           </div>
           
-          {/* 3D Visualization */}
-          <div className="h-[500px] w-full rounded-lg overflow-hidden bg-black">
+          <div
+            className={cn(
+              'h-[500px] w-full rounded-lg overflow-hidden',
+              isLight ? 'bg-white' : 'bg-black'
+            )}
+          >
             <Canvas camera={{ position: [0, 5, 10], fov: 50 }}>
-              <ServerFarm numServers={numServers} powerPerServer={powerPerServer} />
-              <OrbitControls 
+              <color attach="background" args={[canvasBg]} />
+              <ServerFarm
+                numServers={numServers}
+                powerPerServer={powerPerServer}
+                isLight={isLight}
+              />
+              <OrbitControls
                 enablePan={true}
                 enableZoom={true}
                 enableRotate={true}
