@@ -24,13 +24,16 @@ export interface MemArchitectureSpec {
   dataRate: number;
 }
 
+/** Per-operation currents by rail (SI amperes), LPDDR5/LPDDR5X Micron-style. */
+export type IddByRailA = Record<string, Record<string, number>>;
+
 export interface MemPowerSpec {
-  // Voltages
+  // Voltages (DDR5 primary rails)
   vdd: number;
   vpp: number;
   vddq: number;
 
-  // Core IDD currents (mA)
+  // Core IDD currents (mA for DDR5 presets; may be 0 when using idd_by_rail_A)
   idd0: number;
   idd2n: number;
   idd3n: number;
@@ -41,7 +44,7 @@ export interface MemPowerSpec {
   idd2p: number;
   idd3p: number;
 
-  // VPP IPP currents (mA)
+  // VPP IPP currents (mA) — not used for LPDDR5/LPDDR5X
   ipp0: number;
   ipp2n: number;
   ipp3n: number;
@@ -51,6 +54,16 @@ export interface MemPowerSpec {
   ipp6n: number;
   ipp2p: number;
   ipp3p: number;
+
+  /** LPDDR5/LPDDR5X: optional explicit rail voltages (V); else parser uses rails range midpoints. */
+  vdd1?: number;
+  vdd2h?: number;
+  vdd2l?: number;
+  /** LPDDR: JEDEC-style supply range tuples or scalars for parse_memspec_dict. */
+  rails?: Record<string, [number, number] | number>;
+  /** LPDDR: IDD broken down by rail (amperes in JSON aligned with core). */
+  idd_by_rail_A?: IddByRailA;
+  idd7?: number;
 }
 
 export interface MemTimingSpec {
@@ -62,6 +75,11 @@ export interface MemTimingSpec {
   RFC2: number;
   RFCsb: number;
   REFI: number;
+  /** LPDDR5X-style refresh / bank timing (nanoseconds). */
+  RFCab_ns?: number;
+  RFCpb_ns?: number;
+  PBR2PBR_ns?: number;
+  PBR2ACT_ns?: number;
 }
 
 export interface MemSpec {
@@ -98,6 +116,13 @@ export interface PowerResult {
   P_VDD_core: number;
   P_VPP_core: number;
   P_total_core: number;
+  /** LPDDR5/LPDDR5X core rail totals (when returned by API). */
+  P_VDD1?: number;
+  P_VDD2H?: number;
+  P_VDD2L?: number;
+  P_VDDQ?: number;
+  P_background?: number;
+  P_SELFREF?: number;
 }
 
 export interface DIMMPowerResult {
@@ -127,6 +152,8 @@ export interface MemoryPreset {
   speed: string;
   capacity: string;
   memspec: MemSpec;
+  /** Preset family for UI filtering (DDR5 vs LPDDR). */
+  family?: 'DDR5' | 'LPDDR';
 }
 
 export type PowerComponent = 

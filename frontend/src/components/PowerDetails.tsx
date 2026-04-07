@@ -19,6 +19,71 @@ export function PowerDetails({ powerResult }: PowerDetailsProps) {
     );
   }
 
+  const lpddrRailDetails =
+    powerResult.P_VDD1 != null ||
+    powerResult.P_VDD2H != null ||
+    powerResult.P_VDD2L != null ||
+    powerResult.P_VDDQ != null
+      ? [
+          {
+            label: 'VDD1 rail',
+            value: powerResult.P_VDD1 ?? 0,
+            icon: Cpu,
+            color: 'text-power-vdd',
+            description: 'LPDDR VDD1 core contribution',
+          },
+          {
+            label: 'VDD2H rail',
+            value: powerResult.P_VDD2H ?? 0,
+            icon: Cpu,
+            color: 'text-power-vpp',
+            description: 'LPDDR VDD2H core contribution',
+          },
+          {
+            label: 'VDD2L rail',
+            value: powerResult.P_VDD2L ?? 0,
+            icon: Cpu,
+            color: 'text-power-read',
+            description: 'LPDDR VDD2L core contribution',
+          },
+          {
+            label: 'VDDQ rail',
+            value: powerResult.P_VDDQ ?? 0,
+            icon: Cpu,
+            color: 'text-power-write',
+            description: 'LPDDR VDDQ core contribution',
+          },
+        ]
+      : [];
+
+  const extraLpddr =
+    powerResult.P_background != null || powerResult.P_SELFREF != null
+      ? [
+          ...(powerResult.P_background != null
+            ? [
+                {
+                  label: 'Background',
+                  value: powerResult.P_background,
+                  icon: Activity,
+                  color: 'text-muted-foreground',
+                  description: 'Background / standby rail-related core term',
+                },
+              ]
+            : []),
+          ...(powerResult.P_SELFREF != null
+            ? [
+                {
+                  label: 'Self refresh',
+                  value: powerResult.P_SELFREF,
+                  icon: RefreshCw,
+                  color: 'text-muted-foreground',
+                  description: 'Self-refresh contribution',
+                },
+              ]
+            : []),
+        ]
+      : [];
+
   const details = [
     {
       label: 'Precharge Standby',
@@ -75,9 +140,10 @@ export function PowerDetails({ powerResult }: PowerDetailsProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="!p-4 !pt-0 space-y-2.5">
-        {details.map((item) => {
+        {[...details, ...lpddrRailDetails, ...extraLpddr].map((item) => {
           const Icon = item.icon;
-          const percentage = (item.value / powerResult.P_total_core) * 100;
+          const denom = powerResult.P_total_core || 1;
+          const percentage = (item.value / denom) * 100;
           
           return (
             <div key={item.label} className="group">

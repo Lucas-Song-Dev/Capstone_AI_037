@@ -12,7 +12,77 @@
 
 import type { MemSpec, Workload, PowerResult, DIMMPowerResult } from './types';
 import { calculateChipsPerDIMM } from './ddr5Calculator';
-import { computePowerLocal, registeredToBoolean } from './powerCompute';
+import {
+  computePowerLocal,
+  isLpddrMemoryType,
+  registeredToBoolean,
+} from './powerCompute';
+
+function _coreKey(k: string, raw: Record<string, number>, corePrefix: boolean): number {
+  const key = corePrefix ? `core.${k}` : k;
+  return raw[key] ?? 0;
+}
+
+function _hasLpddrRailKeys(raw: Record<string, number>, corePrefix: boolean): boolean {
+  const p1 = corePrefix ? raw['core.P_VDD1'] : raw.P_VDD1;
+  const p2h = corePrefix ? raw['core.P_VDD2H'] : raw.P_VDD2H;
+  return p1 !== undefined || p2h !== undefined;
+}
+
+function _optionalCoreField(
+  raw: Record<string, number>,
+  k: string,
+  corePrefix: boolean
+): number | undefined {
+  const key = corePrefix ? `core.${k}` : k;
+  if (!(key in raw)) return undefined;
+  const v = raw[key];
+  return typeof v === 'number' && !Number.isNaN(v) ? v : undefined;
+}
+
+/** Map /api/calculate/core JSON (or core.* keys from DIMM response) to PowerResult. */
+export function coreApiResponseToPowerResult(
+  raw: Record<string, number>,
+  corePrefix = false
+): PowerResult {
+  const ck = (k: string) => _coreKey(k, raw, corePrefix);
+  const total = raw.P_total_core ?? ck('P_total_core');
+  if (_hasLpddrRailKeys(raw, corePrefix)) {
+    const v1 = ck('P_VDD1');
+    const v2h = ck('P_VDD2H');
+    const v2l = ck('P_VDD2L');
+    const vq = ck('P_VDDQ');
+    const railSum = v1 + v2h + v2l + vq;
+    return {
+      P_PRE_STBY_core: ck('P_PRE_STBY_core'),
+      P_ACT_STBY_core: ck('P_ACT_STBY_core'),
+      P_ACT_PRE_core: ck('P_ACT_PRE_core'),
+      P_RD_core: ck('P_RD_core'),
+      P_WR_core: ck('P_WR_core'),
+      P_REF_core: ck('P_REF_core'),
+      P_VDD_core: railSum,
+      P_VPP_core: 0,
+      P_total_core: total,
+      P_VDD1: v1,
+      P_VDD2H: v2h,
+      P_VDD2L: v2l,
+      P_VDDQ: vq,
+      P_background: _optionalCoreField(raw, 'P_background', corePrefix),
+      P_SELFREF: _optionalCoreField(raw, 'P_SELFREF', corePrefix),
+    };
+  }
+  return {
+    P_PRE_STBY_core: ck('P_PRE_STBY_core'),
+    P_ACT_STBY_core: ck('P_ACT_STBY_core'),
+    P_ACT_PRE_core: ck('P_ACT_PRE_core'),
+    P_RD_core: ck('P_RD_core'),
+    P_WR_core: ck('P_WR_core'),
+    P_REF_core: ck('P_REF_core'),
+    P_VDD_core: ck('P_VDD_core'),
+    P_VPP_core: ck('P_VPP_core'),
+    P_total_core: total,
+  };
+}
 
 export function getApiBase(): string {
   if (typeof process === 'undefined') return '';
@@ -34,9 +104,60 @@ export function isApiAvailable(): boolean {
   return Boolean(getApiBase());
 }
 
+/** DDR5 scalar IDD/IPP keys the Python core expects in amperes (see core/src/parser.py). */
+const DDR5_CURRENT_FIELDS = [
+  'idd0',
+  'idd2n',
+  'idd2p',
+  'idd3n',
+  'idd3p',
+  'idd4r',
+  'idd4w',
+  'idd5b',
+  'idd6n',
+  'idd7',
+  'ipp0',
+  'ipp2n',
+  'ipp2p',
+  'ipp3n',
+  'ipp3p',
+  'ipp4r',
+  'ipp4w',
+  'ipp5b',
+  'ipp6n',
+] as const;
+
 /**
- * Shape memspec for FastAPI: `registered` as "true"/"false", `nbrOfDBs` and `nbrOfDevices` set.
- * Mirrors tests/e2e/api_payload.py.
+ * UI presets store DDR5 IDD/IPP in mA (types.ts); the core/parser use SI amperes.
+ * Convert when any “small-current” field looks like mA (> 1). IDD5B is excluded from the
+ * trigger because it can legitimately stay > 1 A after a correct mA→A step (e.g. 10+ A
+ * from bad preset data), which would otherwise cause a second pass to over-scale.
+ */
+const DDR5_MA_TRIGGER_FIELDS = DDR5_CURRENT_FIELDS.filter((k) => k !== 'idd5b');
+
+export function ddr5MempowerspecUiMaToCoreAmps(p: MemSpec['mempowerspec']): MemSpec['mempowerspec'] {
+  const looksLikeMa = DDR5_MA_TRIGGER_FIELDS.some((k) => {
+    const v = p[k as keyof typeof p];
+    return typeof v === 'number' && !Number.isNaN(v) && Math.abs(v) > 1;
+  });
+  if (!looksLikeMa) {
+    return { ...p };
+  }
+  const out: MemSpec['mempowerspec'] = { ...p };
+  const numeric = out as unknown as Record<string, number>;
+  for (const k of DDR5_CURRENT_FIELDS) {
+    const v = numeric[k];
+    if (typeof v === 'number' && !Number.isNaN(v)) {
+      numeric[k] = v / 1000;
+    }
+  }
+  return out;
+}
+
+/**
+ * Shape memspec for FastAPI: `registered` as "true"/"false", `nbrOfDBs` and `nbrOfDevices` set;
+ * DDR5 currents mA → A for the Python core (same as ddr5Calculator `toAmps`).
+ * LPDDR5/X leaves `rails` / `idd_by_rail_A` unchanged (already amperes in app JSON).
  */
 export function normalizeMemspecForApi(memspec: MemSpec): MemSpec {
   const arch = memspec.memarchitecturespec;
@@ -47,9 +168,15 @@ export function normalizeMemspecForApi(memspec: MemSpec): MemSpec {
       : arch.nbrOfBankGroups ?? 8;
   const registered = registeredToBoolean(memspec.registered) ? 'true' : 'false';
 
+  const lpddr = isLpddrMemoryType(memspec.memoryType);
+  const mempowerspec = lpddr
+    ? memspec.mempowerspec
+    : ddr5MempowerspecUiMaToCoreAmps(memspec.mempowerspec);
+
   return {
     ...memspec,
     registered,
+    mempowerspec,
     memarchitecturespec: {
       ...arch,
       nbrOfDevices,
@@ -74,17 +201,10 @@ export function dimmApiResponseToResult(
   const P_total_interface = raw.P_total_interface ?? 0;
   const P_total = raw.P_total ?? P_total_core + P_total_interface;
 
-  const corePower: PowerResult = {
-    P_PRE_STBY_core: raw['core.P_PRE_STBY_core'] ?? 0,
-    P_ACT_STBY_core: raw['core.P_ACT_STBY_core'] ?? 0,
-    P_ACT_PRE_core: raw['core.P_ACT_PRE_core'] ?? 0,
-    P_RD_core: raw['core.P_RD_core'] ?? 0,
-    P_WR_core: raw['core.P_WR_core'] ?? 0,
-    P_REF_core: raw['core.P_REF_core'] ?? 0,
-    P_VDD_core: raw['core.P_VDD_core'] ?? 0,
-    P_VPP_core: raw['core.P_VPP_core'] ?? 0,
-    P_total_core,
-  };
+  const corePower = coreApiResponseToPowerResult(raw, true);
+  if (!corePower.P_total_core && P_total_core) {
+    corePower.P_total_core = P_total_core;
+  }
 
   const chipsPerDIMM = calculateChipsPerDIMM(memspec.memarchitecturespec);
 
@@ -116,7 +236,8 @@ export async function fetchCorePower(memspec: MemSpec, workload: Workload): Prom
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error((err as { detail?: string }).detail ?? `API error ${res.status}`);
   }
-  return res.json() as Promise<PowerResult>;
+  const data = (await res.json()) as Record<string, number>;
+  return coreApiResponseToPowerResult(data, false);
 }
 
 /** POST /api/calculate/interface - returns interface power breakdown (P_total_interface, etc.) */
@@ -194,7 +315,14 @@ export async function tryApiThenLocalPower(
   memspec: MemSpec,
   workload: Workload
 ): Promise<TryApiThenLocalResult> {
+  const lpddr = isLpddrMemoryType(memspec.memoryType);
+
   if (!isApiAvailable()) {
+    if (lpddr) {
+      throw new Error(
+        'LPDDR5/LPDDR5X presets require the power API (Python core). Set NEXT_PUBLIC_API_URL to your API, or use same-origin deployment with /api routes.'
+      );
+    }
     const { powerResult, dimmPowerResult } = computePowerLocal(memspec, workload);
     return { powerResult, dimmPowerResult, usedFallback: false };
   }
@@ -204,7 +332,10 @@ export async function tryApiThenLocalPower(
       fetchDIMMPower(memspec, workload),
     ]);
     return { powerResult, dimmPowerResult, usedFallback: false };
-  } catch {
+  } catch (e) {
+    if (lpddr) {
+      throw e instanceof Error ? e : new Error(String(e));
+    }
     const { powerResult, dimmPowerResult } = computePowerLocal(memspec, workload);
     return { powerResult, dimmPowerResult, usedFallback: true };
   }

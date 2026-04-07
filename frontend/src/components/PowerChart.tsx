@@ -35,6 +35,10 @@ const COLORS = {
   refresh: '#eab308',
   vdd: '#3b82f6',
   vpp: '#f97316',
+  vdd1: '#3b82f6',
+  vdd2h: '#f97316',
+  vdd2l: '#22c55e',
+  vddq: '#a855f7',
 };
 
 export function PowerBreakdownChart({ powerResult }: PowerChartProps) {
@@ -109,20 +113,51 @@ export function PowerBreakdownChart({ powerResult }: PowerChartProps) {
 }
 
 export function PowerDistributionChart({ powerResult }: PowerChartProps) {
-  const data = useMemo(() => {
-    if (!powerResult) return [];
-    
-    return [
-      { name: 'VDD Core', value: powerResult.P_VDD_core * 1000, color: COLORS.vdd },
-      { name: 'VPP Core', value: powerResult.P_VPP_core * 1000, color: COLORS.vpp },
-    ];
+  const { data, title, description } = useMemo(() => {
+    if (!powerResult) {
+      return {
+        data: [] as { name: string; value: number; color: string }[],
+        title: 'Supply rails',
+        description: '',
+      };
+    }
+
+    const hasLpddrRails =
+      powerResult.P_VDD1 != null ||
+      powerResult.P_VDD2H != null ||
+      powerResult.P_VDD2L != null ||
+      powerResult.P_VDDQ != null;
+
+    if (hasLpddrRails) {
+      return {
+        data: [
+          { name: 'VDD1', value: (powerResult.P_VDD1 ?? 0) * 1000, color: COLORS.vdd1 },
+          { name: 'VDD2H', value: (powerResult.P_VDD2H ?? 0) * 1000, color: COLORS.vdd2h },
+          { name: 'VDD2L', value: (powerResult.P_VDD2L ?? 0) * 1000, color: COLORS.vdd2l },
+          { name: 'VDDQ', value: (powerResult.P_VDDQ ?? 0) * 1000, color: COLORS.vddq },
+        ],
+        title: 'LPDDR core rails',
+        description:
+          'Slice values are milliwatts per supply (VDD1, VDD2H, VDD2L, VDDQ). Sum matches total core rail power in the summary.',
+      };
+    }
+
+    return {
+      data: [
+        { name: 'VDD Core', value: powerResult.P_VDD_core * 1000, color: COLORS.vdd },
+        { name: 'VPP Core', value: powerResult.P_VPP_core * 1000, color: COLORS.vpp },
+      ],
+      title: 'VDD vs VPP',
+      description:
+        'Slice values are milliwatts of core power on each rail. VDD + VPP in mW correspond to the watt-scale VDD/VPP lines in the total summary (same physics, different unit for chart readability).',
+    };
   }, [powerResult]);
 
   if (!powerResult) {
   return (
     <Card className="power-card">
       <CardHeader className="!p-4 !pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">VDD vs VPP</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">Supply rails</CardTitle>
       </CardHeader>
       <CardContent className="!p-4 !pt-0 h-[200px] flex items-center justify-center">
           <p className="text-muted-foreground text-sm">No data available</p>
@@ -136,13 +171,17 @@ export function PowerDistributionChart({ powerResult }: PowerChartProps) {
   return (
     <Card className="power-card">
       <CardHeader className="!p-4 !pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">VDD vs VPP Distribution</CardTitle>
-        <DescriptionWithTooltip
-          variant="card"
-          className="text-xs pt-1"
-          label="About this chart"
-          text="Slice values are milliwatts of core power on each rail. VDD + VPP in mW correspond to the watt-scale VDD/VPP lines in the total summary (same physics, different unit for chart readability)."
-        />
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {title === 'VDD vs VPP' ? 'VDD vs VPP Distribution' : 'LPDDR rail distribution'}
+        </CardTitle>
+        {description ? (
+          <DescriptionWithTooltip
+            variant="card"
+            className="text-xs pt-1"
+            label="About this chart"
+            text={description}
+          />
+        ) : null}
       </CardHeader>
       <CardContent className="!p-4 !pt-0">
         <ResponsiveContainer width="100%" height={220}>
@@ -195,6 +234,12 @@ export function TotalPowerDisplay({ powerResult }: PowerChartProps) {
     );
   }
 
+  const hasLpddrRails =
+    powerResult.P_VDD1 != null ||
+    powerResult.P_VDD2H != null ||
+    powerResult.P_VDD2L != null ||
+    powerResult.P_VDDQ != null;
+
   return (
     <Card className="power-card relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-accent/10 pointer-events-none" />
@@ -205,20 +250,41 @@ export function TotalPowerDisplay({ powerResult }: PowerChartProps) {
             {formatPower(powerResult.P_total_core)}
           </p>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-4 text-center">
-          <div>
-            <p className="data-label">VDD Power</p>
-            <p className="text-lg font-mono text-power-vdd">
-              {formatPower(powerResult.P_VDD_core)}
-            </p>
+        {hasLpddrRails ? (
+          <div className="mt-4 grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
+            <div>
+              <p className="data-label">VDD1</p>
+              <p className="text-sm font-mono text-power-vdd">{formatPower(powerResult.P_VDD1 ?? 0)}</p>
+            </div>
+            <div>
+              <p className="data-label">VDD2H</p>
+              <p className="text-sm font-mono text-power-vpp">{formatPower(powerResult.P_VDD2H ?? 0)}</p>
+            </div>
+            <div>
+              <p className="data-label">VDD2L</p>
+              <p className="text-sm font-mono text-power-read">{formatPower(powerResult.P_VDD2L ?? 0)}</p>
+            </div>
+            <div>
+              <p className="data-label">VDDQ</p>
+              <p className="text-sm font-mono text-power-write">{formatPower(powerResult.P_VDDQ ?? 0)}</p>
+            </div>
           </div>
-          <div>
-            <p className="data-label">VPP Power</p>
-            <p className="text-lg font-mono text-power-vpp">
-              {formatPower(powerResult.P_VPP_core)}
-            </p>
+        ) : (
+          <div className="mt-4 grid grid-cols-2 gap-4 text-center">
+            <div>
+              <p className="data-label">VDD Power</p>
+              <p className="text-lg font-mono text-power-vdd">
+                {formatPower(powerResult.P_VDD_core)}
+              </p>
+            </div>
+            <div>
+              <p className="data-label">VPP Power</p>
+              <p className="text-lg font-mono text-power-vpp">
+                {formatPower(powerResult.P_VPP_core)}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

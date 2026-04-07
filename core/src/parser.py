@@ -120,37 +120,30 @@ class Workload:
 
 # ---------- Memspec parsing ----------
 
-def load_memspec(path: str) -> MemSpec:
+
+def _coerce_registered(val: Any) -> bool:
+    """Coerce JSON/API registered field to bool (handles 'false' string)."""
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, str):
+        return val.strip().lower() in ("true", "1", "yes")
+    return bool(val)
+
+
+def parse_memspec_dict(raw: Dict[str, Any]) -> MemSpec:
     """
-    Load memory specification from JSON file with validation.
-    
-    Raises:
-        ValueError: If required fields are missing or have invalid values
-        FileNotFoundError: If the spec file doesn't exist
+    Parse a memspec object dict (same shape as the JSON `memspec` value, not the file wrapper).
+
+    Used by load_memspec and by the HTTP API for DDR5 / LPDDR5 / LPDDR5X.
     """
-    try:
-        with open(path, "r") as f:
-            raw = json.load(f)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"Memory specification file not found: {path}")
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON in memory specification file: {e}")
-    
-    # Validate top-level structure
-    if "memspec" not in raw:
-        raise ValueError("Missing required field 'memspec' in JSON file")
-    
-    raw = raw["memspec"]
-    
-    # Validate required sections
     if "memarchitecturespec" not in raw:
         raise ValueError("Missing required section 'memarchitecturespec' in memspec")
     if "mempowerspec" not in raw:
         raise ValueError("Missing required section 'mempowerspec' in memspec")
     if "memtimingspec" not in raw:
         raise ValueError("Missing required section 'memtimingspec' in memspec")
-    
-    register = bool(raw["registered"])
+
+    register = _coerce_registered(raw.get("registered", False))
     
     arch_raw = raw["memarchitecturespec"]
     p_raw = raw["mempowerspec"]
@@ -304,6 +297,26 @@ def load_memspec(path: str) -> MemSpec:
     )
 
 
+def load_memspec(path: str) -> MemSpec:
+    """
+    Load memory specification from JSON file with validation.
+
+    Expects top-level key ``memspec`` wrapping the object passed to :func:`parse_memspec_dict`.
+    """
+    try:
+        with open(path, "r") as f:
+            raw = json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Memory specification file not found: {path}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in memory specification file: {e}")
+
+    if "memspec" not in raw:
+        raise ValueError("Missing required field 'memspec' in JSON file")
+
+    return parse_memspec_dict(raw["memspec"])
+
+
 # Workload parsing #
 def load_workload(path: str) -> Workload:
     """
@@ -355,33 +368,3 @@ def load_workload(path: str) -> Workload:
         )
     except (ValueError, TypeError) as e:
         raise ValueError(f"Invalid value in workload specification: {e}")
-    """
-    JEDEC/Micron-style DRAM power parameters.
-
-    Voltages:
-      vdd      DRAM core supply (array logic + sense amps).
-      vpp      Wordline pump voltage used for ACT and REF operations.
-      vddq     I/O supply for DQ/DQS bus.
-
-    Core IDD currents:
-      idd0     Current during a full ACT → ACTIVE → PRE row cycle.
-      idd2n    Precharged standby current (CKE HIGH).
-      idd3n    Active standby current (one or more banks active).
-      idd4r    Current during read bursts (core internal read activation).
-      idd4w    Current during write bursts.
-      idd5b    Refresh current (per-bank refresh).
-      idd6n    Self-refresh current (CKE LOW, autonomous refresh).
-      idd2p    Precharged power-down current (CKE LOW).
-      idd3p    Active power-down current (CKE LOW).
-
-    VPP IPP currents:
-      ipp0     VPP current during ACTIVATE (wordline driver energy).
-      ipp2n    Precharged VPP standby current.
-      ipp3n    Active VPP standby current.
-      ipp4r    Additional VPP current during reads.
-      ipp4w    Additional VPP current during writes.
-      ipp5b    VPP current during refresh (wordline energization).
-      ipp6n    Self-refresh VPP current.
-      ipp2p    Precharged power-down VPP current.
-      ipp3p    Active power-down VPP current.
-    """

@@ -4,7 +4,12 @@ import { useEffect, useState } from 'react';
 import { MemoryStick, Github, Info, Settings, Zap, MemoryStick as DIMMIcon, Target, Server } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { LinkIconTooltip } from '@/components/HelpTooltip';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  useTooltipStayOpenOnClick,
+} from '@/components/ui/tooltip';
 import { ONBOARDING_CONFIGURATION_KEY, isOnboardingComplete } from '@/lib/onboarding-storage';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -43,6 +48,40 @@ export function Header() {
     { path: '/dimm-power', label: 'DIMM Power', icon: DIMMIcon },
   ];
 
+  function LockedNavItemWithTooltip({
+    item,
+  }: {
+    item: { path: string; label: string; icon: typeof Settings };
+  }) {
+    const Icon = item.icon;
+    const { open, onOpenChange, triggerProps } = useTooltipStayOpenOnClick();
+
+    return (
+      <Tooltip open={open} onOpenChange={onOpenChange} delayDuration={120}>
+        <TooltipTrigger asChild>
+          <div
+            {...triggerProps}
+            role="button"
+            tabIndex={0}
+            aria-disabled="true"
+            aria-expanded={open}
+            data-testid={`locked-nav-${item.path}`}
+            className="inline-flex h-8 px-3 text-xs items-center justify-center gap-2 whitespace-nowrap rounded-md opacity-45 cursor-help"
+          >
+            <Icon className="w-3.5 h-3.5 mr-1.5" />
+            {item.label}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent
+          side="bottom"
+          className="max-w-xs bg-muted text-muted-foreground border border-border shadow-sm"
+        >
+          <p className="text-sm">Please select a configuration.</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
   const NavButton = ({
     item,
     locked = false,
@@ -54,26 +93,7 @@ export function Header() {
     const isActive = pathname === item.path;
     const isConfigurationTab = item.path === '/configuration';
     if (locked) {
-      return (
-        <Tooltip delayDuration={120}>
-          <TooltipTrigger asChild>
-            <div
-              aria-disabled="true"
-              data-testid={`locked-nav-${item.path}`}
-              className="inline-flex h-8 px-3 text-xs items-center justify-center gap-2 whitespace-nowrap rounded-md opacity-45 cursor-help"
-            >
-              <Icon className="w-3.5 h-3.5 mr-1.5" />
-              {item.label}
-            </div>
-          </TooltipTrigger>
-          <TooltipContent
-            side="bottom"
-            className="max-w-xs bg-muted text-muted-foreground border border-border shadow-sm"
-          >
-            <p className="text-sm">Please select a configuration.</p>
-          </TooltipContent>
-        </Tooltip>
-      );
+      return <LockedNavItemWithTooltip item={item} />;
     }
     return (
       <Button

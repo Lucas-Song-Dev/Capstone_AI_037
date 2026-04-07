@@ -103,6 +103,62 @@ def api_compatible_memspec():
 
 
 @pytest.fixture
+def api_compatible_lpddr_memspec():
+    """LPDDR5X-style payload for calculate routes (matches api/tests sample_lpddr_memspec)."""
+    t_ck = 1.0 / 3.75e9
+    return {
+        "memoryId": "test_lpddr5x",
+        "memoryType": "LPDDR5X",
+        "registered": "false",
+        "memarchitecturespec": {
+            "width": 16,
+            "nbrOfBanks": 16,
+            "nbrOfBankGroups": 4,
+            "nbrOfRanks": 1,
+            "nbrOfColumns": 64,
+            "nbrOfRows": 49152,
+            "nbrOfDevices": 1,
+            "nbrOfDBs": 0,
+            "burstLength": 16,
+            "dataRate": 2,
+        },
+        "mempowerspec": {
+            "rails": {
+                "vdd1_range_V": [1.70, 1.95],
+                "vdd2h_range_V": [1.01, 1.12],
+                "vdd2l_range_V": [0.87, 0.97],
+                "vddq_range_V": [0.47, 0.57],
+            },
+            "idd_by_rail_A": {
+                "idd0": {"vdd1": 0.01, "vdd2h": 0.05, "vdd2l": 0.001, "vddq": 0.001},
+                "idd2n": {"vdd1": 1.5e-3, "vdd2h": 16.0e-3, "vdd2l": 0.2e-3, "vddq": 0.6e-3},
+                "idd2p": {"vdd1": 1.0e-3, "vdd2h": 10.0e-3, "vdd2l": 0.2e-3, "vddq": 0.5e-3},
+                "idd3n": {"vdd1": 1.7e-3, "vdd2h": 21.0e-3, "vdd2l": 0.2e-3, "vddq": 0.6e-3},
+                "idd3p": {"vdd1": 1.0e-3, "vdd2h": 12.0e-3, "vdd2l": 0.2e-3, "vddq": 0.5e-3},
+                "idd4r": {"vdd1": 12.0e-3, "vdd2h": 475.0e-3, "vdd2l": 0.2e-3, "vddq_read": 126.0e-3},
+                "idd4w": {"vdd1": 11.0e-3, "vdd2h": 310.0e-3, "vdd2l": 0.2e-3, "vddq": 0.6e-3},
+                "idd5b_allbank": {"vdd1": 2.5e-3, "vdd2h": 24.0e-3, "vdd2l": 0.2e-3, "vddq": 0.6e-3},
+                "idd6n": {"vdd1": 1.0e-3, "vdd2h": 8.0e-3, "vdd2l": 0.2e-3, "vddq": 0.5e-3},
+            },
+        },
+        "memtimingspec": {
+            "tCK": t_ck,
+            "RAS": 0,
+            "RCD": 0,
+            "RP": 0,
+            "RFC1": 0,
+            "RFC2": 0,
+            "RFCsb": 0,
+            "REFI": 0,
+            "RFCab_ns": 280.0,
+            "RFCpb_ns": 140.0,
+            "PBR2PBR_ns": 90.0,
+            "PBR2ACT_ns": 7.5,
+        },
+    }
+
+
+@pytest.fixture
 def api_compatible_workload():
     """Same shape as api/tests/conftest sample_workload."""
     return {

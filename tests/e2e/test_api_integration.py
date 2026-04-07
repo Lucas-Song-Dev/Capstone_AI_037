@@ -123,3 +123,14 @@ class TestAPIIntegration:
             assert row["P_total_core"] == pytest.approx(one["P_total_core"], rel=1e-9, abs=1e-12)
             assert row["P_total"] == pytest.approx(one["P_total"], rel=1e-9, abs=1e-12)
 
+    def test_lpddr_calculate_dimm_smoke(
+        self, client, api_compatible_lpddr_memspec, api_compatible_workload
+    ):
+        """LPDDR5X /dimm returns LPDDR rail keys on core.* (not DDR5 VDD/VPP-only)."""
+        req = {"memspec": api_compatible_lpddr_memspec, "workload": api_compatible_workload}
+        r = client.post("/api/calculate/dimm", json=req)
+        assert r.status_code == 200, r.text
+        j = r.json()
+        assert "core.P_VDD2H" in j
+        assert j.get("P_total_core", 0) > 0
+

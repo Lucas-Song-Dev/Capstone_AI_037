@@ -4,7 +4,7 @@ Tests for core power calculation API endpoints.
 
 import pytest
 
-from main import _registered_str_to_bool, memspec_model_to_obj, MemSpecModel
+from main import _registered_str_to_bool, memspec_api_model_to_obj, MemSpecRequestModel
 
 # conftest fixtures are automatically available to pytest
 
@@ -18,9 +18,9 @@ def test_registered_str_to_bool():
     assert _registered_str_to_bool("no") is False
 
 
-def test_memspec_model_to_obj_registered_is_bool(sample_memspec):
-    model = MemSpecModel(**sample_memspec)
-    obj = memspec_model_to_obj(model)
+def test_memspec_api_model_to_obj_registered_is_bool(sample_memspec):
+    model = MemSpecRequestModel(**sample_memspec)
+    obj = memspec_api_model_to_obj(model)
     assert obj.registered is False
     assert isinstance(obj.registered, bool)
 

@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { normalizeMemspecForApi, tryApiThenLocalPower } from './api';
+import {
+  normalizeMemspecForApi,
+  ddr5MempowerspecUiMaToCoreAmps,
+  tryApiThenLocalPower,
+  coreApiResponseToPowerResult,
+  dimmApiResponseToResult,
+} from './api';
 import type { MemSpec, Workload } from './types';
 
 const workload: Workload = {
@@ -16,6 +22,45 @@ const workload: Workload = {
   System_tRC_ns: 46,
   tRRDsch_ns: 5,
 };
+
+function lpddrMemspec(): MemSpec {
+  const m = baseMemspec();
+  return {
+    ...m,
+    memoryId: 'lpddr',
+    memoryType: 'LPDDR5X',
+    memarchitecturespec: {
+      ...m.memarchitecturespec,
+      width: 16,
+      nbrOfBankGroups: 4,
+      nbrOfColumns: 64,
+      nbrOfRows: 49152,
+      nbrOfDBs: 0,
+    },
+    mempowerspec: {
+      ...m.mempowerspec,
+      rails: {
+        vdd1_range_V: [1.7, 1.95],
+        vdd2h_range_V: [1.01, 1.12],
+        vdd2l_range_V: [0.87, 0.97],
+        vddq_range_V: [0.47, 0.57],
+      },
+      idd_by_rail_A: {
+        idd2n: { vdd1: 0.001, vdd2h: 0.016, vdd2l: 0.0002, vddq: 0.0006 },
+      },
+    },
+    memtimingspec: {
+      ...m.memtimingspec,
+      tCK: 1 / 3.75e9,
+      RAS: 0,
+      RCD: 0,
+      RP: 0,
+      RFC1: 0,
+      REFI: 0,
+      RFCab_ns: 280,
+    },
+  };
+}
 
 function baseMemspec(): MemSpec {
   return {
@@ -120,10 +165,102 @@ describe('normalizeMemspecForApi', () => {
     expect(out.memarchitecturespec.nbrOfDevices).toBe(1);
   });
 
-  it('is stable when called twice', () => {
+  it('is stable when called twice (mA→A only once)', () => {
     const once = normalizeMemspecForApi(baseMemspec());
     const twice = normalizeMemspecForApi(once);
     expect(twice).toEqual(once);
+  });
+
+  it('converts DDR5 IDD/IPP from mA to A for the Python core', () => {
+    const out = normalizeMemspecForApi(baseMemspec());
+    expect(out.mempowerspec.idd3n).toBeCloseTo(0.105, 6);
+    expect(out.mempowerspec.idd5b).toBeCloseTo(10.5, 6);
+    expect(out.mempowerspec.ipp2n).toBeCloseTo(0.0045, 6);
+  });
+
+  it('leaves LPDDR mempowerspec rails / idd_by_rail_A unchanged', () => {
+    const out = normalizeMemspecForApi(lpddrMemspec());
+    expect(out.mempowerspec.idd_by_rail_A?.idd2n?.vdd1).toBe(0.001);
+  });
+});
+
+describe('ddr5MempowerspecUiMaToCoreAmps', () => {
+  it('does not scale values already in amperes', () => {
+    const p = baseMemspec().mempowerspec;
+    const si = {
+      ...p,
+      idd0: 0.05,
+      idd2n: 0.046,
+      idd3n: 0.105,
+      idd4r: 0.21,
+      idd4w: 0.245,
+      idd5b: 10.5,
+      idd6n: 0.046,
+      idd2p: 0.043,
+      idd3p: 0.102,
+      ipp0: 0.005,
+      ipp2n: 0.0045,
+      ipp3n: 0.01,
+      ipp4r: 0.02,
+      ipp4w: 0.025,
+      ipp5b: 1.0,
+      ipp6n: 0.0045,
+      ipp2p: 0.004,
+      ipp3p: 0.0095,
+    };
+    const out = ddr5MempowerspecUiMaToCoreAmps(si);
+    expect(out.idd3n).toBe(0.105);
+    expect(out.idd5b).toBe(10.5);
+  });
+});
+
+describe('coreApiResponseToPowerResult', () => {
+  it('maps DDR5 flat core response', () => {
+    const r = coreApiResponseToPowerResult(mockCoreJson, false);
+    expect(r.P_VDD_core).toBe(0.5);
+    expect(r.P_VPP_core).toBe(0.1);
+    expect(r.P_VDD1).toBeUndefined();
+  });
+
+  it('maps LPDDR rail keys and aggregates P_VDD_core', () => {
+    const r = coreApiResponseToPowerResult(
+      {
+        ...mockCoreJson,
+        P_VDD1: 0.01,
+        P_VDD2H: 0.4,
+        P_VDD2L: 0.02,
+        P_VDDQ: 0.03,
+        P_total_core: 0.9,
+      },
+      false
+    );
+    expect(r.P_VDD1).toBe(0.01);
+    expect(r.P_VDD2H).toBe(0.4);
+    expect(r.P_VDD_core).toBeCloseTo(0.46, 5);
+    expect(r.P_VPP_core).toBe(0);
+  });
+});
+
+describe('dimmApiResponseToResult LPDDR', () => {
+  it('reads core.P_VDD* rails', () => {
+    const raw = {
+      P_total_core: 1,
+      P_total_interface: 0.05,
+      P_total: 1.05,
+      'core.P_VDD1': 0.02,
+      'core.P_VDD2H': 0.5,
+      'core.P_VDD2L': 0.03,
+      'core.P_VDDQ': 0.04,
+      'core.P_PRE_STBY_core': 0,
+      'core.P_ACT_STBY_core': 0,
+      'core.P_ACT_PRE_core': 0,
+      'core.P_RD_core': 0,
+      'core.P_WR_core': 0,
+      'core.P_REF_core': 0,
+    };
+    const d = dimmApiResponseToResult(raw, baseMemspec());
+    expect(d.corePower.P_VDD2H).toBe(0.5);
+    expect(d.corePower.P_VDD_core).toBeCloseTo(0.59, 5);
   });
 });
 
@@ -190,5 +327,16 @@ describe('tryApiThenLocalPower', () => {
     const { powerResult, usedFallback } = await tryApiThenLocalPower(baseMemspec(), workload);
     expect(usedFallback).toBe(true);
     expect(powerResult.P_total_core).toBeGreaterThan(0);
+  });
+
+  it('throws when LPDDR and API URL is empty', async () => {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', '');
+    await expect(tryApiThenLocalPower(lpddrMemspec(), workload)).rejects.toThrow(/LPDDR5\/LPDDR5X/);
+  });
+
+  it('rethrows on API failure for LPDDR (no DDR5 local fallback)', async () => {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://127.0.0.1:9');
+    global.fetch = vi.fn().mockRejectedValue(new Error('network'));
+    await expect(tryApiThenLocalPower(lpddrMemspec(), workload)).rejects.toThrow('network');
   });
 });

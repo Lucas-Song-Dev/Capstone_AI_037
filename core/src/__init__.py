@@ -18,6 +18,7 @@ from .lpddr5_interface_model import LPDDR5InterfacePowerModel
 from .parser import (
     load_memspec,
     load_workload,
+    parse_memspec_dict,
     MemSpec,
     Workload,
     MemArchitectureSpec,
@@ -36,6 +37,7 @@ __all__ = [
     "LPDDR5InterfacePowerModel",
     "load_memspec",
     "load_workload",
+    "parse_memspec_dict",
     "MemSpec",
     "Workload",
     "MemArchitectureSpec",
