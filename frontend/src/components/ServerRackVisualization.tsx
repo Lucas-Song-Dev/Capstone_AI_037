@@ -30,6 +30,8 @@ const RACK_DEPTH = 1;
 const RACK_HEIGHT = 2;
 const SERVER_HEIGHT = 0.04; // Height of each server unit
 const SPACING = 0.1;
+/** Must match ServerFarm cap so on-card stats match cubes drawn. */
+const MAX_RACKS_IN_SCENE = 100;
 
 function ServerCube({ 
   position, 
@@ -188,7 +190,7 @@ function ServerFarm({
 }) {
   const numRacks = rackCountForServers(numServers, SERVERS_PER_RACK);
   // Limit visualization to reasonable number for performance
-  const maxRacksToRender = 100;
+  const maxRacksToRender = MAX_RACKS_IN_SCENE;
   const racksToRender = Math.min(numRacks, maxRacksToRender);
   const racksPerRow = Math.ceil(Math.sqrt(racksToRender));
   
@@ -255,36 +257,64 @@ export function ServerRackVisualization({
 }: ServerRackVisualizationProps) {
   const { resolvedTheme } = useTheme();
   const isLight = resolvedTheme === 'light';
-  const numRacks = rackCountForServers(numServers, SERVERS_PER_RACK);
+  const numRacksTotal = rackCountForServers(numServers, SERVERS_PER_RACK);
+  const maxServersInScene = MAX_RACKS_IN_SCENE * SERVERS_PER_RACK;
+  const serversInScene = Math.min(Math.max(0, numServers), maxServersInScene);
+  const sceneTruncated = numServers > serversInScene;
+  const powerKwScene = fleetMemoryPowerKw(serversInScene, powerPerServer);
+  const powerKwFleet = fleetMemoryPowerKw(numServers, powerPerServer);
   const canvasBg = isLight ? '#ffffff' : '#000000';
 
   return (
     <Card className="power-card">
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
+        <CardTitle className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <span>Server Farm Visualization</span>
-          <div className="text-sm font-normal text-muted-foreground">
-            {numServers.toLocaleString()} servers • {numRacks} rack{numRacks !== 1 ? 's' : ''}
+          <div className="text-sm font-normal text-muted-foreground text-right sm:text-left">
+            {sceneTruncated ? (
+              <span>
+                <span className="text-foreground font-medium tabular-nums">
+                  {serversInScene.toLocaleString()}
+                </span>{" "}
+                servers drawn ·{" "}
+                <span className="tabular-nums">{numServers.toLocaleString()}</span> fleet ·{" "}
+                {numRacksTotal} rack{numRacksTotal !== 1 ? "s" : ""} ({MAX_RACKS_IN_SCENE} rack
+                {MAX_RACKS_IN_SCENE !== 1 ? "s" : ""} max in view)
+              </span>
+            ) : (
+              <span>
+                {numServers.toLocaleString()} server{numServers !== 1 ? "s" : ""} · {numRacksTotal} rack
+                {numRacksTotal !== 1 ? "s" : ""}
+              </span>
+            )}
           </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {/* Stats */}
+          {/* Stats — match what is actually rendered when the scene is capped */}
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
-              <p className="text-muted-foreground">Total Servers</p>
-              <p className="text-2xl font-bold">{numServers.toLocaleString()}</p>
+              <p className="text-muted-foreground">Servers in view</p>
+              <p className="text-2xl font-bold tabular-nums">{serversInScene.toLocaleString()}</p>
+              {sceneTruncated ? (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Fleet total {numServers.toLocaleString()}
+                </p>
+              ) : null}
             </div>
             <div>
-              <p className="text-muted-foreground">Total Power</p>
-              <p className="text-2xl font-bold">
-                {fleetMemoryPowerKw(numServers, powerPerServer).toFixed(1)} kW
-              </p>
+              <p className="text-muted-foreground">Power in view</p>
+              <p className="text-2xl font-bold tabular-nums">{powerKwScene.toFixed(1)} kW</p>
+              {sceneTruncated ? (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Fleet {powerKwFleet.toFixed(1)} kW
+                </p>
+              ) : null}
             </div>
             <div>
-              <p className="text-muted-foreground">Power/Server</p>
-              <p className="text-2xl font-bold">{powerPerServer.toFixed(1)} W</p>
+              <p className="text-muted-foreground">Power / server</p>
+              <p className="text-2xl font-bold tabular-nums">{powerPerServer.toFixed(1)} W</p>
             </div>
           </div>
           

@@ -72,6 +72,7 @@ export default function ServerDeployment() {
     return powerBudgetMode === 'total_fleet' ? v / TOTAL_BUDGET_REFERENCE_SERVERS : v;
   }, [powerBudget, powerBudgetMode]);
 
+  /** Fleet size for stats and (full) planning: under total-fleet mode = max homogeneous servers within total memory power budget. */
   const fleetServerCountForViz = useMemo(() => {
     if (powerBudgetMode === 'per_server') {
       return Math.max(0, parseInt(numServers, 10) || 0);
@@ -79,7 +80,7 @@ export default function ServerDeployment() {
     if (!selectedConfig) return 0;
     const totalW = parseFloat(powerBudget);
     if (!Number.isFinite(totalW) || totalW <= 0 || selectedConfig.powerPerServer <= 0) return 0;
-    return Math.min(1_000_000, Math.max(1, Math.floor(totalW / selectedConfig.powerPerServer)));
+    return Math.min(1_000_000, Math.floor(totalW / selectedConfig.powerPerServer));
   }, [powerBudgetMode, numServers, powerBudget, selectedConfig]);
 
   const handleSearch = async () => {
@@ -427,7 +428,8 @@ export default function ServerDeployment() {
                         {powerBudgetMode === "total_fleet" ? (
                           <>
                             <strong>Estimated from your total budget</strong> after you select a configuration:{" "}
-                            <code>floor(total W ÷ memory W per server)</code>, capped at 1,000,000. This field is not
+                            <code>floor(total W ÷ memory W per server)</code> (0 if a single server exceeds the budget),
+                            capped at 1,000,000. This field is not
                             editable in total-fleet mode; switch to per-server budget to type a server count directly.
                           </>
                         ) : (
@@ -450,7 +452,7 @@ export default function ServerDeployment() {
                     readOnly={powerBudgetMode === "total_fleet"}
                     value={
                       powerBudgetMode === "total_fleet"
-                        ? selectedConfig && fleetServerCountForViz > 0
+                        ? selectedConfig
                           ? String(fleetServerCountForViz)
                           : ""
                         : numServers
