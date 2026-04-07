@@ -1,33 +1,32 @@
 """
-FastAPI API for DDR5 Power Calculator.
-
-This API provides endpoints for DDR5 power calculations that can be called
-from the Next.js frontend deployed on Vercel.
+FastAPI API for DDR5 / LPDDR5 / LPDDR5X power calculator (core package).
 """
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
 import sys
 import os
 from pathlib import Path
 
 # Add core/src directory to path to import the package
-# Project root is two levels up from api/main.py
 project_root = Path(__file__).parent.parent
 core_src_path = project_root / "core" / "src"
 sys.path.insert(0, str(core_src_path))
 
 from ddr5 import DDR5
+from lpddr5 import LPDDR5
 from dimm import DIMM
 from core_model import DDR5CorePowerModel
 from interface_model import DDR5InterfacePowerModel
-from parser import MemSpec, Workload
+from lpddr5_core_model import LPDDR5CorePowerModel
+from lpddr5_interface_model import LPDDR5InterfacePowerModel
+from parser import MemSpec, Workload, parse_memspec_dict
 
 app = FastAPI(
-    title="DDR5 Power Calculator API",
-    description="JEDEC-compliant DDR5 power modeling API",
+    title="DDR5 / LPDDR5 Power Calculator API",
+    description="JEDEC-aligned DDR5 and LPDDR5/LPDDR5X power modeling (core package)",
     version="0.1.0",
 )
 
@@ -43,7 +42,6 @@ app.add_middleware(
 )
 
 
-# Pydantic models for request/response
 class MemArchitectureSpecModel(BaseModel):
     width: int
     nbrOfBanks: int
@@ -56,7 +54,6 @@ class MemArchitectureSpecModel(BaseModel):
     burstLength: int
     dataRate: int
 
-    # JSON may send floats (e.g. from JS math); core/parser use int counts.
     @field_validator(
         "width",
         "nbrOfBanks",
@@ -77,39 +74,19 @@ class MemArchitectureSpecModel(BaseModel):
         return v
 
 
-class MemPowerSpecModel(BaseModel):
-    vdd: float
-    vpp: float
-    vddq: float
-    idd0: float
-    idd2n: float
-    idd3n: float
-    idd4r: float
-    idd4w: float
-    idd5b: float
-    idd6n: float
-    idd2p: float
-    idd3p: float
-    ipp0: float
-    ipp2n: float
-    ipp3n: float
-    ipp4r: float
-    ipp4w: float
-    ipp5b: float
-    ipp6n: float
-    ipp2p: float
-    ipp3p: float
-
-
 class MemTimingSpecModel(BaseModel):
-    tCK: float
-    RAS: int
-    RCD: int
-    RP: int
-    RFC1: int
-    RFC2: int
-    RFCsb: int
-    REFI: int
+    tCK: float = 0.0
+    RAS: int = 0
+    RCD: int = 0
+    RP: int = 0
+    RFC1: int = 0
+    RFC2: int = 0
+    RFCsb: int = 0
+    REFI: int = 0
+    RFCab_ns: float = 0.0
+    RFCpb_ns: float = 0.0
+    PBR2PBR_ns: float = 0.0
+    PBR2ACT_ns: float = 0.0
 
     @field_validator(
         "RAS",
@@ -128,12 +105,14 @@ class MemTimingSpecModel(BaseModel):
         return v
 
 
-class MemSpecModel(BaseModel):
+class MemSpecRequestModel(BaseModel):
+    """Mempowerspec is a free-form dict (DDR5 scalars or LPDDR rails / idd_by_rail_A). Parsed by core ``parse_memspec_dict``."""
+
     memoryId: str
     memoryType: str
-    registered: str
+    registered: Any
     memarchitecturespec: MemArchitectureSpecModel
-    mempowerspec: MemPowerSpecModel
+    mempowerspec: Dict[str, Any]
     memtimingspec: MemTimingSpecModel
 
 
@@ -153,93 +132,40 @@ class WorkloadModel(BaseModel):
 
 
 class PowerCalculationRequest(BaseModel):
-    memspec: MemSpecModel
+    memspec: MemSpecRequestModel
     workload: WorkloadModel
 
 
 class BatchDimmPowerRequest(BaseModel):
-    """Many memspecs, one workload — used by inverse search and preset scans."""
-
     workload: WorkloadModel
-    memspecs: List[MemSpecModel]
+    memspecs: List[MemSpecRequestModel]
 
 
 MAX_DIMM_BATCH = 512
 
 
 def _registered_str_to_bool(s: str) -> bool:
-    """API accepts registered as string; core MemSpec uses bool."""
+    """API / tests: string registered field to bool ('false', '0', 'no' -> False)."""
     t = str(s).strip().lower()
     return t in ("true", "1", "yes")
 
 
-def memspec_model_to_obj(memspec_model: MemSpecModel) -> MemSpec:
-    """Convert Pydantic model to MemSpec object."""
-    from parser import MemArchitectureSpec, MemPowerSpec, MemTimingSpec
-    
-    arch = MemArchitectureSpec(
-        width=memspec_model.memarchitecturespec.width,
-        nbrOfBanks=memspec_model.memarchitecturespec.nbrOfBanks,
-        nbrOfBankGroups=memspec_model.memarchitecturespec.nbrOfBankGroups,
-        nbrOfRanks=memspec_model.memarchitecturespec.nbrOfRanks,
-        nbrOfColumns=memspec_model.memarchitecturespec.nbrOfColumns,
-        nbrOfRows=memspec_model.memarchitecturespec.nbrOfRows,
-        nbrOfDevices=memspec_model.memarchitecturespec.nbrOfDevices,
-        nbrOfDBs=memspec_model.memarchitecturespec.nbrOfDBs,
-        burstLength=memspec_model.memarchitecturespec.burstLength,
-        dataRate=memspec_model.memarchitecturespec.dataRate,
-    )
-    
-    power = MemPowerSpec(
-        vdd=memspec_model.mempowerspec.vdd,
-        vpp=memspec_model.mempowerspec.vpp,
-        vddq=memspec_model.mempowerspec.vddq,
-        idd0=memspec_model.mempowerspec.idd0,
-        idd2n=memspec_model.mempowerspec.idd2n,
-        idd3n=memspec_model.mempowerspec.idd3n,
-        idd4r=memspec_model.mempowerspec.idd4r,
-        idd4w=memspec_model.mempowerspec.idd4w,
-        idd5b=memspec_model.mempowerspec.idd5b,
-        idd6n=memspec_model.mempowerspec.idd6n,
-        idd2p=memspec_model.mempowerspec.idd2p,
-        idd3p=memspec_model.mempowerspec.idd3p,
-        ipp0=memspec_model.mempowerspec.ipp0,
-        ipp2n=memspec_model.mempowerspec.ipp2n,
-        ipp3n=memspec_model.mempowerspec.ipp3n,
-        ipp4r=memspec_model.mempowerspec.ipp4r,
-        ipp4w=memspec_model.mempowerspec.ipp4w,
-        ipp5b=memspec_model.mempowerspec.ipp5b,
-        ipp6n=memspec_model.mempowerspec.ipp6n,
-        ipp2p=memspec_model.mempowerspec.ipp2p,
-        ipp3p=memspec_model.mempowerspec.ipp3p,
-    )
-    
-    timing = MemTimingSpec(
-        tCK=memspec_model.memtimingspec.tCK,
-        RAS=memspec_model.memtimingspec.RAS,
-        RCD=memspec_model.memtimingspec.RCD,
-        RP=memspec_model.memtimingspec.RP,
-        RFC1=memspec_model.memtimingspec.RFC1,
-        RFC2=memspec_model.memtimingspec.RFC2,
-        RFCsb=memspec_model.memtimingspec.RFCsb,
-        REFI=memspec_model.memtimingspec.REFI,
-    )
-    
-    return MemSpec(
-        memoryId=memspec_model.memoryId,
-        memoryType=memspec_model.memoryType,
-        registered=_registered_str_to_bool(memspec_model.registered),
-        memarchitecturespec=arch,
-        mempowerspec=power,
-        memtimingspec=timing,
-    )
+def memspec_api_model_to_obj(m: MemSpecRequestModel) -> MemSpec:
+    raw = {
+        "memoryId": m.memoryId,
+        "memoryType": m.memoryType,
+        "registered": m.registered,
+        "memarchitecturespec": m.memarchitecturespec.model_dump(),
+        "mempowerspec": dict(m.mempowerspec),
+        "memtimingspec": m.memtimingspec.model_dump(),
+    }
+    return parse_memspec_dict(raw)
 
 
 def workload_model_to_obj(workload_model: WorkloadModel) -> Workload:
-    """Convert Pydantic model to Workload object."""
-    from parser import Workload
-    
-    return Workload(
+    from parser import Workload as W
+
+    return W(
         BNK_PRE_percent=workload_model.BNK_PRE_percent,
         CKE_LO_PRE_percent=workload_model.CKE_LO_PRE_percent,
         CKE_LO_ACT_percent=workload_model.CKE_LO_ACT_percent,
@@ -255,118 +181,125 @@ def workload_model_to_obj(workload_model: WorkloadModel) -> Workload:
     )
 
 
+def _is_lpddr(memspec: MemSpec) -> bool:
+    return memspec.mempowerspec.memoryType.upper() in ("LPDDR5", "LPDDR5X")
+
+
+def compute_core_result(memspec: MemSpec, workload: Workload) -> Dict[str, float]:
+    if _is_lpddr(memspec):
+        core_model = LPDDR5CorePowerModel()
+        dram = LPDDR5(memspec, workload, core_model=core_model)
+        return dram.compute_core()
+    core_model = DDR5CorePowerModel()
+    dram = DDR5(memspec, workload, core_model=core_model)
+    return dram.compute_core()
+
+
+def compute_interface_result(memspec: MemSpec, workload: Workload) -> Dict[str, float]:
+    if _is_lpddr(memspec):
+        interface_model = LPDDR5InterfacePowerModel()
+        return interface_model.compute(memspec, workload)
+    interface_model = DDR5InterfacePowerModel()
+    return interface_model.compute(memspec, workload)
+
+
+def compute_dimm_result(memspec: MemSpec, workload: Workload) -> Dict[str, float]:
+    if _is_lpddr(memspec):
+        dimm = DIMM.from_memspec(
+            memspec,
+            workload,
+            core_model=LPDDR5CorePowerModel(),
+            interface_model=LPDDR5InterfacePowerModel(),
+            dram_cls=LPDDR5,
+        )
+        return dimm.compute_all()
+    dimm = DIMM.from_memspec(
+        memspec,
+        workload,
+        core_model=DDR5CorePowerModel(),
+        interface_model=DDR5InterfacePowerModel(),
+    )
+    return dimm.compute_all()
+
+
+def _parse_request_memspec(m: MemSpecRequestModel) -> MemSpec:
+    try:
+        return memspec_api_model_to_obj(m)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
 @app.get("/")
 async def root():
-    """Health check endpoint."""
-    return {"status": "ok", "message": "DDR5 Power Calculator API"}
+    return {"status": "ok", "message": "DDR5 / LPDDR5 Power Calculator API"}
 
 
 @app.get("/health")
 async def health():
-    """Health check endpoint."""
     return {"status": "healthy"}
 
 
 @app.get("/api/health")
 async def health_under_api_prefix():
-    """Same as /health — use this when the app is only reachable under /api/* (e.g. Vercel rewrite to Mangum)."""
     return await health()
 
 
 @app.post("/api/calculate/core", response_model=Dict[str, float])
 async def calculate_core_power(request: PowerCalculationRequest):
-    """
-    Calculate DDR5 core power consumption.
-    
-    Returns a dictionary with power breakdown values in Watts.
-    """
     try:
-        memspec = memspec_model_to_obj(request.memspec)
+        memspec = _parse_request_memspec(request.memspec)
         workload = workload_model_to_obj(request.workload)
-        
-        core_model = DDR5CorePowerModel()
-        ddr5 = DDR5(memspec, workload, core_model=core_model)
-        
-        result = ddr5.compute_core()
-        return result
+        return compute_core_result(memspec, workload)
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/calculate/interface", response_model=Dict[str, float])
 async def calculate_interface_power(request: PowerCalculationRequest):
-    """
-    Calculate DDR5 interface power consumption.
-    
-    Returns a dictionary with interface power breakdown values in Watts.
-    """
     try:
-        memspec = memspec_model_to_obj(request.memspec)
+        memspec = _parse_request_memspec(request.memspec)
         workload = workload_model_to_obj(request.workload)
-        
-        interface_model = DDR5InterfacePowerModel()
-        result = interface_model.compute(memspec, workload)
-        return result
+        return compute_interface_result(memspec, workload)
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/calculate/all", response_model=Dict[str, float])
 async def calculate_all_power(request: PowerCalculationRequest):
-    """
-    Calculate both core and interface power consumption (single device).
-    
-    Returns a dictionary with complete power breakdown values in Watts.
-    """
     try:
-        memspec = memspec_model_to_obj(request.memspec)
+        memspec = _parse_request_memspec(request.memspec)
         workload = workload_model_to_obj(request.workload)
-        
-        core_model = DDR5CorePowerModel()
-        interface_model = DDR5InterfacePowerModel()
-        ddr5 = DDR5(memspec, workload, core_model=core_model)
-        core_result = ddr5.compute_core()
-        interface_result = interface_model.compute(memspec, workload)
-        
+        core_result = compute_core_result(memspec, workload)
+        interface_result = compute_interface_result(memspec, workload)
         result = dict(core_result)
         result.update(interface_result)
         result["P_total_interface"] = interface_result.get("P_total_interface", 0.0)
         result["P_total"] = core_result.get("P_total_core", 0.0) + result["P_total_interface"]
         return result
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/calculate/dimm", response_model=Dict[str, float])
 async def calculate_dimm_power(request: PowerCalculationRequest):
-    """
-    Calculate DIMM-level power consumption.
-    
-    Returns a dictionary with DIMM power breakdown values in Watts.
-    """
     try:
-        memspec = memspec_model_to_obj(request.memspec)
+        memspec = _parse_request_memspec(request.memspec)
         workload = workload_model_to_obj(request.workload)
-        
-        core_model = DDR5CorePowerModel()
-        interface_model = DDR5InterfacePowerModel()
-        dimm = DIMM.from_memspec(
-            memspec, workload,
-            core_model=core_model,
-            interface_model=interface_model,
-        )
-        result = dimm.compute_all()
-        return result
+        return compute_dimm_result(memspec, workload)
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/api/calculate/dimm/batch")
 async def calculate_dimm_power_batch(request: BatchDimmPowerRequest):
-    """
-    DIMM-level power for many memspecs with the same workload (Python core, in-process).
-    Response order matches request memspec order.
-    """
     if len(request.memspecs) == 0:
         return {"results": []}
     if len(request.memspecs) > MAX_DIMM_BATCH:
@@ -376,23 +309,18 @@ async def calculate_dimm_power_batch(request: BatchDimmPowerRequest):
         )
     try:
         workload = workload_model_to_obj(request.workload)
-        core_model = DDR5CorePowerModel()
-        interface_model = DDR5InterfacePowerModel()
         results: List[Dict[str, float]] = []
         for m_model in request.memspecs:
-            memspec = memspec_model_to_obj(m_model)
-            dimm = DIMM.from_memspec(
-                memspec,
-                workload,
-                core_model=core_model,
-                interface_model=interface_model,
-            )
-            results.append(dimm.compute_all())
+            memspec = _parse_request_memspec(m_model)
+            results.append(compute_dimm_result(memspec, workload))
         return {"results": results}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

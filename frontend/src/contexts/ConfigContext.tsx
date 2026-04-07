@@ -194,13 +194,24 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         throw new Error('Missing memtimingspec');
       }
       
-      // Convert current values from A to mA if needed
       const powerSpec = memspecData.mempowerspec;
+      const mt = String(powerSpec.memoryType || memspecData.memoryType || 'DDR5')
+        .trim()
+        .toUpperCase();
+      const isLpddr = mt === 'LPDDR5' || mt === 'LPDDR5X';
+
+      if (isLpddr) {
+        setMemspec({
+          ...memspecData,
+          mempowerspec: { ...powerSpec },
+        } as MemSpec);
+        return;
+      }
+
       const convertToMa = (val: number) => {
-        // If value is less than 1, assume it's in Amps and convert to mA
         return val < 1 ? val * 1000 : val;
       };
-      
+
       const normalizedPowerSpec = {
         ...powerSpec,
         idd0: convertToMa(powerSpec.idd0 || powerSpec.IDD0 || 0),
@@ -222,7 +233,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         ipp2p: convertToMa(powerSpec.ipp2p || powerSpec.IPP2P || 0),
         ipp3p: convertToMa(powerSpec.ipp3p || powerSpec.IPP3P || 0),
       };
-      
+
       setMemspec({
         ...memspecData,
         mempowerspec: normalizedPowerSpec,

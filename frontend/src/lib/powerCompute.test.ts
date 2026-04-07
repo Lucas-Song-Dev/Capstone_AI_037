@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { registeredToBoolean, computePowerLocal } from './powerCompute';
+import { registeredToBoolean, computePowerLocal, isLpddrMemoryType } from './powerCompute';
 import type { MemSpec, Workload } from './types';
 
 const baseArch = {
@@ -89,7 +89,21 @@ describe('registeredToBoolean', () => {
   });
 });
 
+describe('isLpddrMemoryType', () => {
+  it('detects LPDDR5 and LPDDR5X', () => {
+    expect(isLpddrMemoryType('LPDDR5')).toBe(true);
+    expect(isLpddrMemoryType('lpddr5x')).toBe(true);
+    expect(isLpddrMemoryType('DDR5')).toBe(false);
+  });
+});
+
 describe('computePowerLocal', () => {
+  it('throws for LPDDR memory types', () => {
+    expect(() => computePowerLocal(baseMemspec({ memoryType: 'LPDDR5X' }), workload)).toThrow(
+      /LPDDR5\/LPDDR5X power is computed by the Python core only/
+    );
+  });
+
   it('returns core and DIMM results', () => {
     const { powerResult, dimmPowerResult } = computePowerLocal(baseMemspec(), workload);
     expect(powerResult.P_total_core).toBeGreaterThan(0);

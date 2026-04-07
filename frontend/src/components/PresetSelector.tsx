@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MemoryStick, Zap } from 'lucide-react';
 import { memoryPresets, workloadPresets } from '@/lib/presets';
-import type { MemSpec, Workload } from '@/lib/types';
+import type { MemSpec, MemoryPreset, Workload } from '@/lib/types';
 import { calculateDataRate } from '@/lib/ddr5Calculator';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +21,10 @@ interface PresetSelectorProps {
   defaultManufacturer?: string;
 }
 
+function presetFamilyOf(p: MemoryPreset): 'DDR5' | 'LPDDR' {
+  return p.family === 'LPDDR' ? 'LPDDR' : 'DDR5';
+}
+
 export function PresetSelector({
   selectedMemoryId,
   selectedWorkloadId,
@@ -29,33 +33,36 @@ export function PresetSelector({
   onSelectWorkload,
   defaultManufacturer,
 }: PresetSelectorProps) {
-  const manufacturers = [...new Set(memoryPresets.map((p) => p.manufacturer))];
-  
-  // Find the manufacturer for the selected preset
-  const selectedPreset = memoryPresets.find((p) => p.id === selectedMemoryId);
-  const initialManufacturer = selectedPreset?.manufacturer || defaultManufacturer || manufacturers[0];
-  const [activeTab, setActiveTab] = useState(initialManufacturer);
-  const isInitialMount = useRef(true);
-  const lastSelectedMemoryId = useRef(selectedMemoryId);
+  const [memoryFamily, setMemoryFamily] = useState<'DDR5' | 'LPDDR'>('DDR5');
 
-  // Only update active tab on initial mount OR when a different preset is selected
-  // Don't update when user manually clicks tabs
+  const filteredMemoryPresets = memoryPresets.filter(
+    (p) => presetFamilyOf(p) === memoryFamily
+  );
+  const manufacturers = [...new Set(filteredMemoryPresets.map((p) => p.manufacturer))];
+
+  const [activeTab, setActiveTab] = useState(
+    () => memoryPresets.find((p) => p.id === selectedMemoryId)?.manufacturer ?? 'Micron',
+  );
+
   useEffect(() => {
-    if (isInitialMount.current) {
-      // Initial mount: set tab based on selected preset
-      const preset = memoryPresets.find((p) => p.id === selectedMemoryId);
-      const manufacturer = preset?.manufacturer || defaultManufacturer || manufacturers[0];
-      setActiveTab(manufacturer);
-      isInitialMount.current = false;
-      lastSelectedMemoryId.current = selectedMemoryId;
-    } else if (lastSelectedMemoryId.current !== selectedMemoryId) {
-      const preset = memoryPresets.find((p) => p.id === selectedMemoryId);
-      if (preset) {
-        setActiveTab(preset.manufacturer);
-      }
-      lastSelectedMemoryId.current = selectedMemoryId;
+    const preset = memoryPresets.find((p) => p.id === selectedMemoryId);
+    if (preset) {
+      setMemoryFamily(presetFamilyOf(preset));
     }
-  }, [selectedMemoryId, defaultManufacturer, manufacturers]);
+  }, [selectedMemoryId]);
+
+  useEffect(() => {
+    if (!manufacturers.includes(activeTab) && manufacturers.length > 0) {
+      setActiveTab(manufacturers[0]);
+    }
+  }, [memoryFamily, manufacturers, activeTab]);
+
+  useEffect(() => {
+    const preset = memoryPresets.find((p) => p.id === selectedMemoryId);
+    if (preset && presetFamilyOf(preset) === memoryFamily && manufacturers.includes(preset.manufacturer)) {
+      setActiveTab(preset.manufacturer);
+    }
+  }, [selectedMemoryId, memoryFamily, manufacturers]);
 
   return (
     <Card className="power-card">
@@ -91,9 +98,35 @@ export function PresetSelector({
           )}
         </div>
 
+        {/* DDR5 vs LPDDR */}
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">Memory type</p>
+          <Tabs
+            value={memoryFamily}
+            onValueChange={(v) => setMemoryFamily(v as 'DDR5' | 'LPDDR')}
+            className="w-full"
+          >
+            <TabsList className="w-full grid grid-cols-2 h-8 bg-secondary">
+              <TabsTrigger value="DDR5" className="text-xs data-[state=active]:bg-primary">
+                DDR5
+              </TabsTrigger>
+              <TabsTrigger value="LPDDR" className="text-xs data-[state=active]:bg-primary">
+                LPDDR5 / LPDDR5X
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
         {/* Memory Presets */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-3 h-8 bg-secondary">
+          <TabsList
+            className={cn(
+              'w-full h-8 bg-secondary',
+              manufacturers.length === 1 && 'grid grid-cols-1',
+              manufacturers.length === 2 && 'grid grid-cols-2',
+              manufacturers.length >= 3 && 'grid grid-cols-3',
+            )}
+          >
             {manufacturers.map((mfr) => (
               <TabsTrigger key={mfr} value={mfr} className="text-xs data-[state=active]:bg-primary">
                 {mfr}
@@ -102,7 +135,7 @@ export function PresetSelector({
           </TabsList>
           {manufacturers.map((mfr) => (
             <TabsContent key={mfr} value={mfr} className="mt-3 space-y-2">
-              {memoryPresets
+              {filteredMemoryPresets
                 .filter((p) => p.manufacturer === mfr)
                 .map((preset) => {
                   const isSelected = selectedMemoryId === preset.id;
