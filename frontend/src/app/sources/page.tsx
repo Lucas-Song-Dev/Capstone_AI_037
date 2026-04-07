@@ -2,7 +2,7 @@
 
 import { Header } from '@/components/Header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ExternalLink, FileText, BookOpen } from 'lucide-react';
+import { ExternalLink, FileText, BookOpen, Scale } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Sources() {
@@ -36,13 +36,36 @@ export default function Sources() {
       type: 'whitepaper',
       description: 'Performance verification white paper showing SK hynix DDR5 boosts server bandwidth by 70% while lowering power consumption by 14.4% compared to DDR4 when applied to 4th Gen Intel® Xeon® Scalable processors.',
     },
+    {
+      title: 'Register Clock Driver for DDR5 Memory',
+      authors: 'Shwetal Arvind Patel (Inventor); Renesas Electronics America Inc. (Assignee)',
+      venue: 'US Patent Application US20170344051A1',
+      year: '2017',
+      url: 'https://patentimages.storage.googleapis.com/ab/9a/59/d3ec2713d33f11/US20170344051A1.pdf',
+      type: 'patent',
+      description:
+        'Patent publication describing DDR5 register clock driver (RCD) architecture, dual-port outputs per channel, and power-related signaling considerations aligned with JEDEC DDR5 DIMM concepts.',
+    },
+    {
+      title: 'TN-40-07: Calculating Memory Power for DDR4 SDRAM',
+      authors: 'Micron Technology, Inc.',
+      venue: 'Technical Note (PDF hosted by Mouser Electronics)',
+      year: '',
+      url: 'https://www.mouser.com/pdfDocs/tn4007_ddr4_power_calculation.pdf',
+      type: 'technical_note',
+      description:
+        'Classic application note on estimating DDR4 SDRAM power from IDD currents and workload activity—useful background for the same class of JEDEC-style current-based models applied to DDR5 in this tool.',
+    },
   ];
 
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'academic':
         return <BookOpen className="w-4 h-4" />;
+      case 'patent':
+        return <Scale className="w-4 h-4" />;
       case 'technical':
+      case 'technical_note':
       case 'whitepaper':
         return <FileText className="w-4 h-4" />;
       default:
@@ -56,8 +79,12 @@ export default function Sources() {
         return 'Academic Paper';
       case 'technical':
         return 'Technical Brief';
+      case 'technical_note':
+        return 'Technical Note';
       case 'whitepaper':
         return 'White Paper';
+      case 'patent':
+        return 'Patent';
       default:
         return 'Document';
     }
