@@ -216,11 +216,10 @@ export default function TargetPower() {
                   </label>
                   <HelpTooltip label="Help: target core power">
                     <p className="text-sm">
-                      <strong>What power do you want the memory chip to use?</strong><br />
-                      This is the power (in Watts) that you want one memory chip to use. 
-                      The tool will search for memory that matches this power as closely 
-                      as possible.                         Think of it like telling a chef &quot;I want a meal that 
-                      has exactly 500 calories&quot; - they&apos;ll find the best recipe that matches!
+                      <strong>Target die (core) power per DRAM device (W).</strong> The inverse search minimizes error
+                      against modeled <code>P_total_core</code> for one die under the current workload. It is not the
+                      full module: interface rails and PMIC / RCD overhead are excluded unless you also constrain DIMM
+                      total.
                     </p>
                   </HelpTooltip>
                 </div>
@@ -240,12 +239,10 @@ export default function TargetPower() {
                   </label>
                   <HelpTooltip label="Help: target DIMM power">
                     <p className="text-sm">
-                      <strong>What power do you want the whole memory stick to use?</strong><br />
-                      This is optional! If you leave it empty, we&apos;ll only match the chip power. 
-                      But if you fill it in, we&apos;ll try to match both the chip power AND the 
-                      whole memory stick power. The DIMM power includes the chip plus extra 
-                      parts like connectors. It&apos;s like saying &quot;I want the engine to use 100W 
-                      AND the whole car to use 150W&quot; - more specific!
+                      <strong>Optional target for full-module power (W).</strong> When set, the loss can include error
+                      on modeled DIMM total (dies × core path plus VDDQ interface and PMIC / RCD overhead as implemented).
+                      Leave empty to optimize core-only. With both targets active, profile and emphasis control how die vs
+                      module mismatch is weighted.
                     </p>
                   </HelpTooltip>
                 </div>

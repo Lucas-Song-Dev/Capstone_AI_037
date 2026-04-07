@@ -115,25 +115,25 @@ export const SERVER_DEPLOYMENT_TUTORIAL_STEPS: SpotlightStep[] = [
   {
     selector: '[data-tutorial="server-deployment-intro"]',
     title: 'Deployment planning',
-    body: 'Model fleet-scale DDR5 choices: per-server power ceiling, minimum data rate, total memory footprint, DIMM slot count, server count, and workload class. The tool ranks configurations that fit and estimates per-server power.',
+    body: 'Model fleet-scale DDR5 choices: memory power budget per server or total fleet (W), minimum data rate, total memory footprint, DIMM slot count, server count in per-server mode, and workload class. The tool ranks configurations that fit and estimates per-server power.',
     placement: 'bottom',
   },
   {
     selector: '[data-tutorial="server-requirements-card"]',
     title: 'Requirements card',
-    body: 'All inputs live in this card. Start with electrical and capacity limits, then fleet size, then workload behavior. Invalid combinations raise inline errors before search so you do not burn time on empty result sets.',
+    body: 'All inputs live in this card. Choose per-server or total-fleet power budget, then electrical and capacity limits, then fleet size when using per-server budget, then workload. Invalid combinations raise inline errors before search.',
     placement: 'bottom',
   },
   {
     selector: '[data-tutorial="server-req-hardware"]',
     title: 'Power, speed, capacity',
-    body: 'Power budget caps memory rail draw per box. Minimum data rate filters slow parts. Total capacity and max DIMMs shape how many modules and which densities are feasible—tighten these to match your motherboard and SKU policy.',
+    body: 'Budget scope toggles per-server watts vs total fleet watts (search converts total using a 100-server reference). Minimum data rate filters slow parts. Total capacity and max DIMMs shape module count and density.',
     placement: 'top',
   },
   {
     selector: '[data-tutorial="server-req-fleet"]',
     title: 'Fleet & workload',
-    body: 'Server count scales energy and procurement totals in summaries. Workload type biases read/write mix assumptions so ranked configs align with database, web, HPC, or idle-ish profiles.',
+    body: 'Server count applies in per-server budget mode for fleet totals and the rack view. In total-fleet mode it is derived from your budget after you pick a configuration. Workload type biases read/write mix for ranking.',
     placement: 'top',
   },
   {

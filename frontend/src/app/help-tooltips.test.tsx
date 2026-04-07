@@ -20,7 +20,7 @@ describe('Help (?) tooltips', () => {
     const trigger = screen.getByRole('button', { name: /help: workload type/i });
     await user.hover(trigger);
     const tooltip = await screen.findByRole('tooltip');
-    expect(within(tooltip).getByText(/What will your server be doing/i)).toBeInTheDocument();
+    expect(within(tooltip).getByText(/Workload \/ command-mix preset/i)).toBeInTheDocument();
     await user.unhover(trigger);
   });
 
@@ -30,7 +30,7 @@ describe('Help (?) tooltips', () => {
     const trigger = screen.getByRole('button', { name: /help: minimum data rate/i });
     await user.hover(trigger);
     const tooltip = await screen.findByRole('tooltip');
-    expect(within(tooltip).getByText(/How fast should the memory be/i)).toBeInTheDocument();
+    expect(within(tooltip).getByText(/Minimum effective data rate \(MT\/s\)/i)).toBeInTheDocument();
   });
 
   it('Target Power: optimizer profile help opens on hover', async () => {

@@ -4,9 +4,11 @@ import { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
+import { useTheme } from 'next-themes';
 import { MemoryDie } from '@/components/DDR5Chip3D';
 import type { BoardState } from '@/lib/builderState';
 import { MAX_BANK_GROUPS } from '@/lib/builderState';
+import { cn } from '@/lib/utils';
 
 export interface BuilderDIMMBoardProps {
   boardState: BoardState;
@@ -125,15 +127,26 @@ function BuilderBoardInner(props: BuilderDIMMBoardProps) {
 }
 
 export function BuilderDIMMBoard(props: BuilderDIMMBoardProps) {
+  const { resolvedTheme } = useTheme();
+  const isLight = resolvedTheme === 'light';
+  const canvasBg = isLight ? '#ffffff' : '#243044';
+  const gridA = isLight ? '#94a3b8' : '#334155';
+  const gridB = isLight ? '#cbd5e1' : '#1e293b';
+
   return (
-    <div className="relative h-[400px] w-full rounded-lg overflow-hidden bg-[#243044]">
+    <div
+      className={cn(
+        'relative h-[400px] w-full rounded-lg overflow-hidden',
+        isLight ? 'bg-white' : 'bg-[#243044]'
+      )}
+    >
       <Canvas camera={{ position: [4, 3, 4], fov: 45 }} gl={{ antialias: true }}>
-        <color attach="background" args={['#243044']} />
-        <ambientLight intensity={0.65} />
-        <directionalLight position={[5, 5, 5]} intensity={1.0} />
-        <directionalLight position={[-5, 3, -5]} intensity={0.5} color="#3b82f6" />
-        <directionalLight position={[0, 8, 2]} intensity={0.4} color="#e2e8f0" />
-        <pointLight position={[0, 3, 0]} intensity={0.6} color="#10b981" />
+        <color attach="background" args={[canvasBg]} />
+        <ambientLight intensity={isLight ? 0.75 : 0.65} />
+        <directionalLight position={[5, 5, 5]} intensity={isLight ? 1.05 : 1.0} />
+        <directionalLight position={[-5, 3, -5]} intensity={isLight ? 0.45 : 0.5} color="#3b82f6" />
+        <directionalLight position={[0, 8, 2]} intensity={isLight ? 0.55 : 0.4} color="#e2e8f0" />
+        <pointLight position={[0, 3, 0]} intensity={isLight ? 0.5 : 0.6} color="#10b981" />
         <BuilderBoardInner {...props} />
         <OrbitControls
           enablePan={false}
@@ -143,10 +156,16 @@ export function BuilderDIMMBoard(props: BuilderDIMMBoardProps) {
           minPolarAngle={Math.PI / 6}
           maxPolarAngle={Math.PI / 2.2}
         />
-        <gridHelper args={[10, 20, '#334155', '#1e293b']} position={[0, -1, 0]} />
+        <gridHelper args={[10, 20, gridA, gridB]} position={[0, -1, 0]} />
       </Canvas>
-      {/* Overlay: one DIMM architecture summary */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-2 rounded-md bg-black/60 text-xs text-slate-200 font-mono pointer-events-none">
+      <div
+        className={cn(
+          'absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-2 rounded-md text-xs font-mono pointer-events-none border',
+          isLight
+            ? 'bg-white/90 text-slate-800 border-border shadow-sm'
+            : 'bg-black/60 text-slate-200 border-transparent'
+        )}
+      >
         <span className="text-slate-400">1 DIMM</span>
         {' · Banks '}
         {props.nbrOfBanks}
