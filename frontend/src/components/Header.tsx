@@ -10,7 +10,6 @@ import {
   MemoryStick as DIMMIcon,
   Target,
   Server,
-  LayoutGrid,
 } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { LinkIconTooltip } from '@/components/HelpTooltip';
@@ -162,14 +161,6 @@ export function Header() {
                 ))}
               </div>
             </nav>
-
-            {/* TEMP_POSTER_ENTRY — remove this block with app/poster-summary/ and PosterDimmSummaryCard.tsx */}
-            <Button variant="outline" size="sm" className="h-8 px-2 sm:px-2.5 text-xs shrink-0" asChild>
-              <Link href="/poster-summary" aria-label="Poster summary dashboard (temporary)">
-                <LayoutGrid className="w-3.5 h-3.5 sm:mr-1" />
-                <span className="hidden sm:inline">Poster</span>
-              </Link>
-            </Button>
 
             <LinkIconTooltip
               href="/sources"
