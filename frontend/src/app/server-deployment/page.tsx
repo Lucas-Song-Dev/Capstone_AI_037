@@ -67,11 +67,6 @@ export default function ServerDeployment() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const selectedEnergyEquivalents = useMemo(() => {
-    if (!selectedConfig) return null;
-    return energyEquivalentsFromWatts(selectedConfig.powerPerServer);
-  }, [selectedConfig]);
-
   const effectivePerServerBudgetW = useMemo(() => {
     const v = parseFloat(powerBudget);
     if (!Number.isFinite(v) || v <= 0) return 0;
@@ -88,6 +83,26 @@ export default function ServerDeployment() {
     if (!Number.isFinite(totalW) || totalW <= 0 || selectedConfig.powerPerServer <= 0) return 0;
     return Math.min(1_000_000, Math.floor(totalW / selectedConfig.powerPerServer));
   }, [powerBudgetMode, numServers, powerBudget, selectedConfig]);
+
+  const fleetPowerForEquivalentsW = useMemo(() => {
+    if (!selectedConfig) return 0;
+
+    // In total-fleet mode, the "fleet power" concept is the total memory budget (W).
+    if (powerBudgetMode === 'total_fleet') {
+      const totalW = parseFloat(powerBudget);
+      return Number.isFinite(totalW) && totalW > 0 ? totalW : 0;
+    }
+
+    // In per-server mode, use the explicit fleet size input × selected per-server power.
+    const servers = fleetServerCountForViz;
+    if (!Number.isFinite(servers) || servers <= 0) return 0;
+    return selectedConfig.powerPerServer * servers;
+  }, [selectedConfig, powerBudgetMode, powerBudget, fleetServerCountForViz]);
+
+  const fleetEnergyEquivalents = useMemo(() => {
+    if (!Number.isFinite(fleetPowerForEquivalentsW) || fleetPowerForEquivalentsW <= 0) return null;
+    return energyEquivalentsFromWatts(fleetPowerForEquivalentsW);
+  }, [fleetPowerForEquivalentsW]);
 
   const handleSearch = async () => {
     setError(null);
@@ -662,11 +677,11 @@ export default function ServerDeployment() {
                           </div>
                           <span className="font-bold">{selectedConfig.powerPerServer.toFixed(3)} W</span>
                         </div>
-                        {selectedEnergyEquivalents ? (
+                        {fleetEnergyEquivalents ? (
                           <div className="p-3 bg-muted/50 rounded-lg space-y-2">
                             <div className="flex items-center justify-between gap-3">
                               <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium">Energy equivalents</span>
+                                <span className="text-sm font-medium">Fleet energy equivalents</span>
                                 <HelpTooltip
                                   title="Assumptions"
                                   description={
@@ -675,36 +690,36 @@ export default function ServerDeployment() {
                                 />
                               </div>
                               <span className="text-xs text-muted-foreground font-mono tabular-nums">
-                                {selectedEnergyEquivalents.kwhPerDay.toFixed(2)} kWh/day ·{" "}
-                                {selectedEnergyEquivalents.kwhPerYear.toFixed(0)} kWh/yr
+                                {fleetEnergyEquivalents.kwhPerDay.toFixed(1)} kWh/day ·{" "}
+                                {fleetEnergyEquivalents.kwhPerYear.toFixed(0)} kWh/yr
                               </span>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                               <div className="rounded bg-background/60 p-2">
                                 <p className="text-muted-foreground">EV driving</p>
                                 <p className="font-medium tabular-nums">
-                                  {selectedEnergyEquivalents.evMilesPerDay.toFixed(0)} mi/day
+                                  {fleetEnergyEquivalents.evMilesPerDay.toFixed(0)} mi/day
                                 </p>
                                 <p className="text-muted-foreground tabular-nums">
-                                  {selectedEnergyEquivalents.evMilesPerYear.toFixed(0)} mi/yr
+                                  {fleetEnergyEquivalents.evMilesPerYear.toFixed(0)} mi/yr
                                 </p>
                               </div>
                               <div className="rounded bg-background/60 p-2">
                                 <p className="text-muted-foreground">EV “full charges”</p>
                                 <p className="font-medium tabular-nums">
-                                  {selectedEnergyEquivalents.evFullChargesPerDay.toFixed(2)} /day
+                                  {fleetEnergyEquivalents.evFullChargesPerDay.toFixed(2)} /day
                                 </p>
                                 <p className="text-muted-foreground tabular-nums">
-                                  {selectedEnergyEquivalents.evFullChargesPerYear.toFixed(1)} /yr
+                                  {fleetEnergyEquivalents.evFullChargesPerYear.toFixed(1)} /yr
                                 </p>
                               </div>
                               <div className="rounded bg-background/60 p-2">
                                 <p className="text-muted-foreground">Calories equivalent</p>
                                 <p className="font-medium tabular-nums">
-                                  {selectedEnergyEquivalents.peopleDailyCaloriesPerDay.toFixed(1)} people/day
+                                  {fleetEnergyEquivalents.peopleDailyCaloriesPerDay.toFixed(0)} people/day
                                 </p>
                                 <p className="text-muted-foreground tabular-nums">
-                                  {selectedEnergyEquivalents.peopleDailyCaloriesPerYear.toFixed(0)} people-days/yr
+                                  {fleetEnergyEquivalents.peopleDailyCaloriesPerYear.toFixed(0)} people-days/yr
                                 </p>
                               </div>
                             </div>
