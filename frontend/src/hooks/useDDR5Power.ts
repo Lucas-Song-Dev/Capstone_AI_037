@@ -27,6 +27,7 @@ export function useDDR5Power(
   const [error, setError] = useState<Error | null>(null);
   
   const timeoutRef = useRef<NodeJS.Timeout>();
+  const isMountedRef = useRef(true);
 
   const calculate = useCallback(() => {
     if (!memspec || !workload) {
@@ -35,8 +36,10 @@ export function useDDR5Power(
       return;
     }
 
-    setIsCalculating(true);
-    setError(null);
+    if (isMountedRef.current) {
+      setIsCalculating(true);
+      setError(null);
+    }
 
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -45,15 +48,21 @@ export function useDDR5Power(
     const runCalculation = async () => {
       try {
         const { powerResult, dimmPowerResult } = await tryApiThenLocalPower(memspec, workload);
-        setPowerResult(powerResult);
-        setDimmPowerResult(dimmPowerResult);
-        setError(null);
+        if (isMountedRef.current) {
+          setPowerResult(powerResult);
+          setDimmPowerResult(dimmPowerResult);
+          setError(null);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err : new Error('Calculation failed'));
-        setPowerResult(null);
-        setDimmPowerResult(null);
+        if (isMountedRef.current) {
+          setError(err instanceof Error ? err : new Error('Calculation failed'));
+          setPowerResult(null);
+          setDimmPowerResult(null);
+        }
       } finally {
-        setIsCalculating(false);
+        if (isMountedRef.current) {
+          setIsCalculating(false);
+        }
       }
     };
 
@@ -62,9 +71,11 @@ export function useDDR5Power(
 
   // Auto-calculate when inputs change
   useEffect(() => {
+    isMountedRef.current = true;
     calculate();
     
     return () => {
+      isMountedRef.current = false;
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }

@@ -39,6 +39,7 @@ import { SERVER_DEPLOYMENT_TUTORIAL_STEPS } from "@/config/spotlight-page-steps"
 import { ONBOARDING_SERVER_DEPLOYMENT_KEY } from "@/lib/onboarding-storage";
 import { DescriptionWithTooltip } from "@/components/DescriptionTooltip";
 import { cn } from "@/lib/utils";
+import { energyEquivalentsFromWatts } from "@/lib/powerEquivalents";
 
 const SERVER_DEPLOYMENT_INTRO =
   "Search memory presets against power, bandwidth, and capacity limits you set. Ranked results favor efficient configs that still meet every constraint. Pick a row to inspect power charts and rack-scale totals before sending the memspec back to Configuration.";
@@ -65,6 +66,11 @@ export default function ServerDeployment() {
   const [selectedConfig, setSelectedConfig] = useState<ServerConfiguration | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const selectedEnergyEquivalents = useMemo(() => {
+    if (!selectedConfig) return null;
+    return energyEquivalentsFromWatts(selectedConfig.powerPerServer);
+  }, [selectedConfig]);
 
   const effectivePerServerBudgetW = useMemo(() => {
     const v = parseFloat(powerBudget);
@@ -656,6 +662,54 @@ export default function ServerDeployment() {
                           </div>
                           <span className="font-bold">{selectedConfig.powerPerServer.toFixed(3)} W</span>
                         </div>
+                        {selectedEnergyEquivalents ? (
+                          <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">Energy equivalents</span>
+                                <HelpTooltip
+                                  title="Assumptions"
+                                  description={
+                                    "Energy = continuous power × time. EV: 0.30 kWh/mi, full charge = 60 kWh. Food: converts to dietary energy using 2,000 kcal/person/day (not the electricity required to grow food)."
+                                  }
+                                />
+                              </div>
+                              <span className="text-xs text-muted-foreground font-mono tabular-nums">
+                                {selectedEnergyEquivalents.kwhPerDay.toFixed(2)} kWh/day ·{" "}
+                                {selectedEnergyEquivalents.kwhPerYear.toFixed(0)} kWh/yr
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                              <div className="rounded bg-background/60 p-2">
+                                <p className="text-muted-foreground">EV driving</p>
+                                <p className="font-medium tabular-nums">
+                                  {selectedEnergyEquivalents.evMilesPerDay.toFixed(0)} mi/day
+                                </p>
+                                <p className="text-muted-foreground tabular-nums">
+                                  {selectedEnergyEquivalents.evMilesPerYear.toFixed(0)} mi/yr
+                                </p>
+                              </div>
+                              <div className="rounded bg-background/60 p-2">
+                                <p className="text-muted-foreground">EV “full charges”</p>
+                                <p className="font-medium tabular-nums">
+                                  {selectedEnergyEquivalents.evFullChargesPerDay.toFixed(2)} /day
+                                </p>
+                                <p className="text-muted-foreground tabular-nums">
+                                  {selectedEnergyEquivalents.evFullChargesPerYear.toFixed(1)} /yr
+                                </p>
+                              </div>
+                              <div className="rounded bg-background/60 p-2">
+                                <p className="text-muted-foreground">Calories equivalent</p>
+                                <p className="font-medium tabular-nums">
+                                  {selectedEnergyEquivalents.peopleDailyCaloriesPerDay.toFixed(1)} people/day
+                                </p>
+                                <p className="text-muted-foreground tabular-nums">
+                                  {selectedEnergyEquivalents.peopleDailyCaloriesPerYear.toFixed(0)} people-days/yr
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ) : null}
                         <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                           <div className="flex items-center gap-2">
                             <Gauge className="w-4 h-4 text-muted-foreground" />
