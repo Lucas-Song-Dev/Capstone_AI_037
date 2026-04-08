@@ -28,6 +28,9 @@ import {
   fleetMemoryPowerKw,
   fleetMemoryCapacityTb,
   rackCountForServers,
+  matchingCapPerServerW,
+  maxServersUnderTotalBudget,
+  fleetRemainingBudgetW,
 } from "@/lib/serverDeploymentMetrics";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PowerBreakdownChart, TotalPowerDisplay } from "@/components/PowerChart";
@@ -70,7 +73,7 @@ export default function ServerDeployment() {
   const effectivePerServerBudgetW = useMemo(() => {
     const v = parseFloat(powerBudget);
     if (!Number.isFinite(v) || v <= 0) return 0;
-    return powerBudgetMode === 'total_fleet' ? v / TOTAL_BUDGET_REFERENCE_SERVERS : v;
+    return powerBudgetMode === 'total_fleet' ? matchingCapPerServerW(v, TOTAL_BUDGET_REFERENCE_SERVERS) : v;
   }, [powerBudget, powerBudgetMode]);
 
   /** Fleet size for stats and (full) planning: under total-fleet mode = max homogeneous servers within total memory power budget. */
@@ -80,8 +83,7 @@ export default function ServerDeployment() {
     }
     if (!selectedConfig) return 0;
     const totalW = parseFloat(powerBudget);
-    if (!Number.isFinite(totalW) || totalW <= 0 || selectedConfig.powerPerServer <= 0) return 0;
-    return Math.min(1_000_000, Math.floor(totalW / selectedConfig.powerPerServer));
+    return maxServersUnderTotalBudget(totalW, selectedConfig.powerPerServer, 1_000_000);
   }, [powerBudgetMode, numServers, powerBudget, selectedConfig]);
 
   const fleetPowerForEquivalentsW = useMemo(() => {
@@ -103,6 +105,21 @@ export default function ServerDeployment() {
     if (!Number.isFinite(fleetPowerForEquivalentsW) || fleetPowerForEquivalentsW <= 0) return null;
     return energyEquivalentsFromWatts(fleetPowerForEquivalentsW);
   }, [fleetPowerForEquivalentsW]);
+
+  const fleetBudgetUsedW = useMemo(() => {
+    if (!selectedConfig) return 0;
+    if (powerBudgetMode !== 'total_fleet') return 0;
+    const totalW = parseFloat(powerBudget);
+    if (!Number.isFinite(totalW) || totalW <= 0) return 0;
+    return fleetServerCountForViz * selectedConfig.powerPerServer;
+  }, [selectedConfig, powerBudgetMode, powerBudget, fleetServerCountForViz]);
+
+  const fleetBudgetRemainingW = useMemo(() => {
+    if (!selectedConfig) return 0;
+    if (powerBudgetMode !== 'total_fleet') return 0;
+    const totalW = parseFloat(powerBudget);
+    return fleetRemainingBudgetW(totalW, fleetServerCountForViz, selectedConfig.powerPerServer);
+  }, [selectedConfig, powerBudgetMode, powerBudget, fleetServerCountForViz]);
 
   const handleSearch = async () => {
     setError(null);
@@ -655,14 +672,27 @@ export default function ServerDeployment() {
                           </span>{" "}
                           per server.
                         </p>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                          Per-server budget headroom (matching cap):{" "}
-                          <span className="font-mono text-foreground">
-                            {effectivePerServerBudgetW.toFixed(3)} W − {selectedConfig.powerPerServer.toFixed(3)} W ={" "}
-                            {(effectivePerServerBudgetW - selectedConfig.powerPerServer).toFixed(3)} W
-                          </span>
-                          .
-                        </p>
+                        {powerBudgetMode === "total_fleet" ? (
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Fleet budget remaining after placing{" "}
+                            <span className="font-mono text-foreground">{fleetServerCountForViz.toLocaleString()}</span>{" "}
+                            servers:{" "}
+                            <span className="font-mono text-foreground">
+                              {(parseFloat(powerBudget) || 0).toFixed(1)} W −{" "}
+                              {fleetBudgetUsedW.toFixed(1)} W = {fleetBudgetRemainingW.toFixed(1)} W
+                            </span>
+                            .
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Per-server budget headroom:{" "}
+                            <span className="font-mono text-foreground">
+                              {effectivePerServerBudgetW.toFixed(3)} W − {selectedConfig.powerPerServer.toFixed(3)} W ={" "}
+                              {(effectivePerServerBudgetW - selectedConfig.powerPerServer).toFixed(3)} W
+                            </span>
+                            .
+                          </p>
+                        )}
                         <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                           <div className="flex items-center gap-2">
                             <Zap className="w-4 h-4 text-power-vdd" />
@@ -725,28 +755,49 @@ export default function ServerDeployment() {
                             </div>
                           </div>
                         ) : null}
-                        <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <Gauge className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">
-                              {powerBudgetMode === "total_fleet" ? "Matching cap / server" : "Power budget / server"}
-                            </span>
+                        {powerBudgetMode === "total_fleet" ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <Gauge className="w-4 h-4 text-muted-foreground" />
+                                <span className="text-sm font-medium">Fleet budget used</span>
+                              </div>
+                              <span className="font-bold">{fleetBudgetUsedW.toFixed(1)} W</span>
+                            </div>
+                            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <MemoryStick className="w-4 h-4 text-accent" />
+                                <span className="text-sm font-medium">Fleet budget remaining</span>
+                              </div>
+                              <span className="font-bold tabular-nums">{fleetBudgetRemainingW.toFixed(1)} W</span>
+                            </div>
                           </div>
-                          <span className="font-bold">{effectivePerServerBudgetW.toFixed(3)} W</span>
-                        </div>
-                        <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <MemoryStick className="w-4 h-4 text-accent" />
-                            <span className="text-sm font-medium">Remaining (per server)</span>
-                          </div>
-                          <span className={`font-bold ${
-                            effectivePerServerBudgetW - selectedConfig.powerPerServer >= 0
-                              ? "text-green-600"
-                              : "text-red-600"
-                          }`}>
-                            {(effectivePerServerBudgetW - selectedConfig.powerPerServer).toFixed(3)} W
-                          </span>
-                        </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <Gauge className="w-4 h-4 text-muted-foreground" />
+                                <span className="text-sm font-medium">Power budget / server</span>
+                              </div>
+                              <span className="font-bold">{effectivePerServerBudgetW.toFixed(3)} W</span>
+                            </div>
+                            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <MemoryStick className="w-4 h-4 text-accent" />
+                                <span className="text-sm font-medium">Remaining (per server)</span>
+                              </div>
+                              <span
+                                className={`font-bold ${
+                                  effectivePerServerBudgetW - selectedConfig.powerPerServer >= 0
+                                    ? "text-green-600"
+                                    : "text-red-600"
+                                }`}
+                              >
+                                {(effectivePerServerBudgetW - selectedConfig.powerPerServer).toFixed(3)} W
+                              </span>
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       {/* Requirements Check */}

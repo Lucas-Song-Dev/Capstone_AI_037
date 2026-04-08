@@ -4,6 +4,9 @@ import {
   fleetMemoryCapacityTb,
   rackCountForServers,
   SERVERS_PER_STANDARD_RACK,
+  matchingCapPerServerW,
+  maxServersUnderTotalBudget,
+  fleetRemainingBudgetW,
 } from './serverDeploymentMetrics';
 
 describe('fleetMemoryPowerKw', () => {
@@ -46,5 +49,45 @@ describe('rackCountForServers', () => {
 
   it('returns 0 for zero servers', () => {
     expect(rackCountForServers(0)).toBe(0);
+  });
+});
+
+describe('matchingCapPerServerW', () => {
+  it('divides total by reference servers for search-time cap', () => {
+    expect(matchingCapPerServerW(100000, 100)).toBe(1000);
+    expect(matchingCapPerServerW(500, 100)).toBe(5);
+  });
+
+  it('returns 0 for invalid inputs', () => {
+    expect(matchingCapPerServerW(0, 100)).toBe(0);
+    expect(matchingCapPerServerW(-1, 100)).toBe(0);
+    expect(matchingCapPerServerW(1000, 0)).toBe(0);
+    expect(matchingCapPerServerW(Number.NaN, 100)).toBe(0);
+  });
+});
+
+describe('maxServersUnderTotalBudget', () => {
+  it('floors total/power and clamps to maxServers', () => {
+    expect(maxServersUnderTotalBudget(100, 10)).toBe(10);
+    expect(maxServersUnderTotalBudget(100, 11)).toBe(9);
+    expect(maxServersUnderTotalBudget(100, 1, 50)).toBe(50);
+  });
+
+  it('returns 0 for invalid inputs', () => {
+    expect(maxServersUnderTotalBudget(0, 10)).toBe(0);
+    expect(maxServersUnderTotalBudget(100, 0)).toBe(0);
+    expect(maxServersUnderTotalBudget(100, -1)).toBe(0);
+  });
+});
+
+describe('fleetRemainingBudgetW', () => {
+  it('computes remaining = total - (servers × powerPerServer)', () => {
+    expect(fleetRemainingBudgetW(100, 10, 10)).toBe(0);
+    expect(fleetRemainingBudgetW(100, 9, 11)).toBe(1);
+  });
+
+  it('floors fractional server counts and never returns negative', () => {
+    expect(fleetRemainingBudgetW(100, 9.9, 11)).toBe(1); // 9×11=99
+    expect(fleetRemainingBudgetW(100, 1000, 11)).toBe(0);
   });
 });
