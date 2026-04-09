@@ -7,6 +7,10 @@ import {
   matchingCapPerServerW,
   maxServersUnderTotalBudget,
   fleetRemainingBudgetW,
+  serverPeakMemoryBandwidthGbps,
+  minServersForBandwidthTarget,
+  minServersForCapacityTarget,
+  fleetAggregateBandwidthGbps,
 } from './serverDeploymentMetrics';
 
 describe('fleetMemoryPowerKw', () => {
@@ -89,5 +93,57 @@ describe('fleetRemainingBudgetW', () => {
   it('floors fractional server counts and never returns negative', () => {
     expect(fleetRemainingBudgetW(100, 9.9, 11)).toBe(1); // 9×11=99
     expect(fleetRemainingBudgetW(100, 1000, 11)).toBe(0);
+  });
+});
+
+describe('serverPeakMemoryBandwidthGbps', () => {
+  it('computes MT/s × 8 × channels / 1000', () => {
+    // 4800 MT/s, 4 channels → 4800 * 8 * 4 / 1000 = 153.6
+    expect(serverPeakMemoryBandwidthGbps(4800, 4)).toBeCloseTo(153.6, 10);
+    expect(serverPeakMemoryBandwidthGbps(3200, 2)).toBeCloseTo(51.2, 10);
+  });
+
+  it('returns 0 for non-positive channels or rate', () => {
+    expect(serverPeakMemoryBandwidthGbps(4800, 0)).toBe(0);
+    expect(serverPeakMemoryBandwidthGbps(0, 4)).toBe(0);
+  });
+});
+
+describe('minServersForBandwidthTarget', () => {
+  it('ceil-divides target by per-server GB/s and respects maxServers', () => {
+    expect(minServersForBandwidthTarget(100, 25)).toBe(4);
+    expect(minServersForBandwidthTarget(101, 25)).toBe(5);
+    expect(minServersForBandwidthTarget(100, 25, 3)).toBe(3);
+  });
+
+  it('returns 0 for invalid targets or zero per-server bandwidth', () => {
+    expect(minServersForBandwidthTarget(0, 10)).toBe(0);
+    expect(minServersForBandwidthTarget(100, 0)).toBe(0);
+    expect(minServersForBandwidthTarget(-1, 10)).toBe(0);
+  });
+});
+
+describe('minServersForCapacityTarget', () => {
+  it('ceil-divides target TB by TB per server', () => {
+    // 256 GB/server = 0.25 TB → 10 TB needs 40 servers
+    expect(minServersForCapacityTarget(10, 256)).toBe(40);
+    // 10.1 TB with 0.25 TB/server → ceil(40.4) = 41
+    expect(minServersForCapacityTarget(10.1, 256)).toBe(41);
+  });
+
+  it('respects maxServers', () => {
+    expect(minServersForCapacityTarget(1_000_000, 64, 100)).toBe(100);
+  });
+
+  it('returns 0 for invalid inputs', () => {
+    expect(minServersForCapacityTarget(0, 128)).toBe(0);
+    expect(minServersForCapacityTarget(100, 0)).toBe(0);
+  });
+});
+
+describe('fleetAggregateBandwidthGbps', () => {
+  it('multiplies floored server count by per-server GB/s', () => {
+    expect(fleetAggregateBandwidthGbps(10, 25)).toBe(250);
+    expect(fleetAggregateBandwidthGbps(10.9, 25)).toBe(250);
   });
 });
