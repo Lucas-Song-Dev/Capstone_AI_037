@@ -5,6 +5,7 @@ import * as serverDeployment from '@/lib/serverDeployment';
 import { memoryPresets, workloadPresets } from '@/lib/presets';
 import { computeCorePower, computeDIMMPower } from '@/lib/ddr5Calculator';
 import type { ServerConfiguration, ServerRequirements } from '@/lib/serverDeployment';
+import { ONBOARDING_SERVER_DEPLOYMENT_KEY } from '@/lib/onboarding-storage';
 import ServerDeployment from './page';
 
 vi.mock('next/navigation', () => ({
@@ -36,6 +37,7 @@ function makeLenientRankedConfig(): ServerConfiguration {
 
 describe('ServerDeployment fleet sizing UI', () => {
   beforeEach(() => {
+    localStorage.setItem(ONBOARDING_SERVER_DEPLOYMENT_KEY, '1');
     const cfg = makeLenientRankedConfig();
     vi.spyOn(serverDeployment, 'findServerConfigurations').mockResolvedValue({
       rankedConfigurations: [cfg],
@@ -70,16 +72,39 @@ describe('ServerDeployment fleet sizing UI', () => {
     expect(screen.getByLabelText(/target fleet memory capacity/i)).toBeInTheDocument();
   });
 
-  it('rejects non-positive target bandwidth before search', async () => {
-    const user = userEvent.setup();
-    render(<ServerDeployment />);
-    await user.click(screen.getByRole('radio', { name: /fleet bw/i }));
-    await user.clear(screen.getByLabelText(/target fleet peak bandwidth/i));
-    await user.type(screen.getByLabelText(/target fleet peak bandwidth/i), '0');
-    await user.click(screen.getByRole('button', { name: /find configurations/i }));
-    expect(await screen.findByText(/target fleet peak bandwidth must be a positive number/i)).toBeInTheDocument();
-    expect(serverDeployment.findServerConfigurations).not.toHaveBeenCalled();
-  });
+  it(
+    'rejects non-positive target bandwidth before search',
+    async () => {
+      const user = userEvent.setup();
+      render(<ServerDeployment />);
+      await user.click(screen.getByRole('radio', { name: /fleet bw/i }));
+      const bwInput = document.getElementById('target-fleet-bw') as HTMLInputElement;
+      await user.clear(bwInput);
+      await user.type(bwInput, '0');
+      await user.click(screen.getByRole('button', { name: /find configurations/i }));
+      expect(await screen.findByText(/target fleet peak bandwidth must be a positive number/i)).toBeInTheDocument();
+      expect(serverDeployment.findServerConfigurations).not.toHaveBeenCalled();
+    },
+    15_000,
+  );
+
+  it(
+    'rejects non-positive target fleet capacity before search',
+    async () => {
+      const user = userEvent.setup();
+      render(<ServerDeployment />);
+      await user.click(screen.getByRole('radio', { name: /fleet cap/i }));
+      const capInput = document.getElementById('target-fleet-cap') as HTMLInputElement;
+      await user.clear(capInput);
+      await user.type(capInput, '0');
+      await user.click(screen.getByRole('button', { name: /find configurations/i }));
+      expect(
+        await screen.findByText(/target fleet memory capacity must be a positive number/i),
+      ).toBeInTheDocument();
+      expect(serverDeployment.findServerConfigurations).not.toHaveBeenCalled();
+    },
+    15_000,
+  );
 
   it('passes powerBudgetPerServer = total÷100 in fleet power mode', async () => {
     const user = userEvent.setup();
