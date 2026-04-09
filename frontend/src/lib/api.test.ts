@@ -241,6 +241,39 @@ describe('coreApiResponseToPowerResult', () => {
   });
 });
 
+describe('dimmApiResponseToResult DDR5 aggregate → per-device corePower', () => {
+  it('divides summed core.* by modeled device count when n > 1', () => {
+    const m = {
+      ...baseMemspec(),
+      memarchitecturespec: {
+        ...baseMemspec().memarchitecturespec,
+        width: 8,
+        nbrOfRanks: 1,
+        nbrOfDevices: 2,
+      },
+    };
+    const raw = {
+      P_total_core: 1.6,
+      P_total_interface: 0.1,
+      P_total: 1.7,
+      'core.P_PRE_STBY_core': 0.2,
+      'core.P_ACT_STBY_core': 0.2,
+      'core.P_ACT_PRE_core': 0.2,
+      'core.P_RD_core': 0.2,
+      'core.P_WR_core': 0.2,
+      'core.P_REF_core': 0.2,
+      'core.P_VDD_core': 1.0,
+      'core.P_VPP_core': 0.6,
+      'core.P_total_core': 1.6,
+    };
+    const d = dimmApiResponseToResult(raw, m);
+    expect(d.corePower.P_total_core).toBeCloseTo(0.8, 5);
+    expect(d.corePower.P_VDD_core).toBeCloseTo(0.5, 5);
+    expect(d.corePowerTotal).toBe(1.6);
+    expect(d.P_core_DIMM).toBe(1.6);
+  });
+});
+
 describe('dimmApiResponseToResult LPDDR', () => {
   it('reads core.P_VDD* rails', () => {
     const raw = {

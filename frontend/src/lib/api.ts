@@ -11,7 +11,7 @@
  */
 
 import type { MemSpec, Workload, PowerResult, DIMMPowerResult } from './types';
-import { calculateChipsPerDIMM } from './ddr5Calculator';
+import { calculateChipsPerDIMM, ddr5ModeledDeviceCount, scalePowerResult } from './ddr5Calculator';
 import {
   computePowerLocal,
   isLpddrMemoryType,
@@ -201,9 +201,15 @@ export function dimmApiResponseToResult(
   const P_total_interface = raw.P_total_interface ?? 0;
   const P_total = raw.P_total ?? P_total_core + P_total_interface;
 
-  const corePower = coreApiResponseToPowerResult(raw, true);
+  let corePower = coreApiResponseToPowerResult(raw, true);
   if (!corePower.P_total_core && P_total_core) {
     corePower.P_total_core = P_total_core;
+  }
+
+  // Python DIMM sums core power over every modeled die; frontend `corePower` is per die (see types.DIMMPowerResult).
+  const nModeled = ddr5ModeledDeviceCount(memspec.memarchitecturespec);
+  if (nModeled > 1) {
+    corePower = scalePowerResult(corePower, 1 / nModeled);
   }
 
   const chipsPerDIMM = calculateChipsPerDIMM(memspec.memarchitecturespec);

@@ -6,6 +6,8 @@ import {
   calculateChipsPerDIMM,
   calculateCapacity,
   calculateDataRate,
+  ddr5ModeledDeviceCount,
+  scalePowerResult,
 } from './ddr5Calculator';
 import type { MemSpec, Workload } from './types';
 
@@ -237,6 +239,28 @@ describe('ddr5Calculator', () => {
         'P_ACT_PRE_core',
       ];
       keys.forEach((k) => expect(result).toHaveProperty(k));
+    });
+  });
+
+  describe('ddr5ModeledDeviceCount', () => {
+    it('matches Python DIMM inference for x8 four devices per subchannel', () => {
+      const arch = { ...mockMemspec.memarchitecturespec, width: 8, nbrOfDevices: 4, nbrOfRanks: 1 };
+      expect(ddr5ModeledDeviceCount(arch)).toBe(8);
+    });
+
+    it('uses raw nbrOfDevices when it does not match standard fill patterns', () => {
+      const arch = { ...mockMemspec.memarchitecturespec, width: 8, nbrOfDevices: 2, nbrOfRanks: 1 };
+      expect(ddr5ModeledDeviceCount(arch)).toBe(2);
+    });
+  });
+
+  describe('scalePowerResult', () => {
+    it('scales all numeric breakdown fields', () => {
+      const p = computeCorePower(mockMemspec, mockWorkload);
+      const half = scalePowerResult(p, 0.5);
+      expect(half.P_total_core).toBeCloseTo(p.P_total_core * 0.5, 6);
+      expect(half.P_VDD_core).toBeCloseTo(p.P_VDD_core * 0.5, 6);
+      expect(half.P_RD_core).toBeCloseTo(p.P_RD_core * 0.5, 6);
     });
   });
 

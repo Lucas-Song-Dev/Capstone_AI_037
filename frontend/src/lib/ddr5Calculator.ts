@@ -1,5 +1,41 @@
 import type { MemSpec, Workload, PowerResult, DIMMPowerResult } from './types';
 
+/** Scale all numeric PowerResult fields (for API DIMM aggregate → per-device). */
+export function scalePowerResult(power: PowerResult, factor: number): PowerResult {
+  const out: PowerResult = { ...power };
+  (Object.keys(out) as (keyof PowerResult)[]).forEach((k) => {
+    const v = out[k];
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      (out as Record<string, number | undefined>)[k as string] = v * factor;
+    }
+  });
+  return out;
+}
+
+/**
+ * DRAM devices modeled by Python `DIMM.from_memspec` (must match core/src/dimm.py `_infer_devices_per_rank`).
+ * Used to turn summed `core.*` power from `/api/calculate/dimm` into per-die `PowerResult`.
+ */
+export function ddr5ModeledDeviceCount(arch: MemSpec['memarchitecturespec']): number {
+  const width = arch.width;
+  const nbrOfDevices =
+    arch.nbrOfDevices != null && !Number.isNaN(Number(arch.nbrOfDevices))
+      ? Math.round(Number(arch.nbrOfDevices))
+      : 1;
+  const numSubchannels = 2;
+  const expectedPerSubch = Math.max(1, Math.floor(32 / width));
+  let perRank: number;
+  if (nbrOfDevices === expectedPerSubch) {
+    perRank = nbrOfDevices * numSubchannels;
+  } else if (nbrOfDevices === expectedPerSubch * numSubchannels) {
+    perRank = nbrOfDevices;
+  } else {
+    perRank = nbrOfDevices;
+  }
+  const ranks = Math.max(1, arch.nbrOfRanks ?? 1);
+  return Math.max(1, perRank * ranks);
+}
+
 /**
  * DDR5 Core Power Calculator
  * Ported from Python implementation
