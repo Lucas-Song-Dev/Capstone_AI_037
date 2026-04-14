@@ -31,6 +31,10 @@ import {
   matchingCapPerServerW,
   maxServersUnderTotalBudget,
   fleetRemainingBudgetW,
+  serverPeakMemoryBandwidthGbps,
+  minServersForBandwidthTarget,
+  minServersForCapacityTarget,
+  fleetAggregateBandwidthGbps,
 } from "@/lib/serverDeploymentMetrics";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PowerBreakdownChart, TotalPowerDisplay } from "@/components/PowerChart";
@@ -50,14 +54,31 @@ const SERVER_DEPLOYMENT_INTRO =
 /** Converts a fleet total memory power budget (W) into a per-server cap for matching (same as disabled server-count field in total-budget mode). */
 const TOTAL_BUDGET_REFERENCE_SERVERS = 100;
 
-type PowerBudgetMode = 'per_server' | 'total_fleet';
+type FleetSizingMode =
+  | "per_server"
+  | "fleet_total_power"
+  | "fleet_total_bandwidth"
+  | "fleet_total_capacity";
+
+const FLEET_SIZING_MODES: FleetSizingMode[] = [
+  "per_server",
+  "fleet_total_power",
+  "fleet_total_bandwidth",
+  "fleet_total_capacity",
+];
+
+function isDerivedFleetServerCount(mode: FleetSizingMode): boolean {
+  return mode !== "per_server";
+}
 
 export default function ServerDeployment() {
   const { setMemspec, setWorkload } = useConfig();
   const router = useRouter();
   
-  const [powerBudgetMode, setPowerBudgetMode] = useState<PowerBudgetMode>('per_server');
+  const [fleetSizingMode, setFleetSizingMode] = useState<FleetSizingMode>("per_server");
   const [powerBudget, setPowerBudget] = useState<string>("100");
+  const [targetFleetBandwidthGbps, setTargetFleetBandwidthGbps] = useState<string>("1000");
+  const [targetFleetCapacityTb, setTargetFleetCapacityTb] = useState<string>("100");
   const [minDataRate, setMinDataRate] = useState<string>("4800");
   const [totalCapacity, setTotalCapacity] = useState<string>("128");
   const [workloadType, setWorkloadType] = useState<ServerRequirements['workloadType']>("database_web");
@@ -73,33 +94,60 @@ export default function ServerDeployment() {
   const effectivePerServerBudgetW = useMemo(() => {
     const v = parseFloat(powerBudget);
     if (!Number.isFinite(v) || v <= 0) return 0;
-    return powerBudgetMode === 'total_fleet' ? matchingCapPerServerW(v, TOTAL_BUDGET_REFERENCE_SERVERS) : v;
-  }, [powerBudget, powerBudgetMode]);
+    return fleetSizingMode === "fleet_total_power"
+      ? matchingCapPerServerW(v, TOTAL_BUDGET_REFERENCE_SERVERS)
+      : v;
+  }, [powerBudget, fleetSizingMode]);
 
-  /** Fleet size for stats and (full) planning: under total-fleet mode = max homogeneous servers within total memory power budget. */
+  const selectedPerServerPeakBandwidthGbps = useMemo(() => {
+    if (!selectedConfig) return 0;
+    return serverPeakMemoryBandwidthGbps(selectedConfig.dataRate, selectedConfig.channelsPerServer);
+  }, [selectedConfig]);
+
+  /** Fleet size for stats and visualization: explicit count, or derived from power / bandwidth / capacity target. */
   const fleetServerCountForViz = useMemo(() => {
-    if (powerBudgetMode === 'per_server') {
+    if (fleetSizingMode === "per_server") {
       return Math.max(0, parseInt(numServers, 10) || 0);
     }
     if (!selectedConfig) return 0;
-    const totalW = parseFloat(powerBudget);
-    return maxServersUnderTotalBudget(totalW, selectedConfig.powerPerServer, 1_000_000);
-  }, [powerBudgetMode, numServers, powerBudget, selectedConfig]);
+    if (fleetSizingMode === "fleet_total_power") {
+      const totalW = parseFloat(powerBudget);
+      return maxServersUnderTotalBudget(totalW, selectedConfig.powerPerServer, 1_000_000);
+    }
+    if (fleetSizingMode === "fleet_total_bandwidth") {
+      const target = parseFloat(targetFleetBandwidthGbps);
+      const per = serverPeakMemoryBandwidthGbps(
+        selectedConfig.dataRate,
+        selectedConfig.channelsPerServer
+      );
+      return minServersForBandwidthTarget(target, per, 1_000_000);
+    }
+    if (fleetSizingMode === "fleet_total_capacity") {
+      const targetTb = parseFloat(targetFleetCapacityTb);
+      return minServersForCapacityTarget(targetTb, selectedConfig.totalCapacity, 1_000_000);
+    }
+    return 0;
+  }, [
+    fleetSizingMode,
+    numServers,
+    powerBudget,
+    selectedConfig,
+    targetFleetBandwidthGbps,
+    targetFleetCapacityTb,
+  ]);
 
   const fleetPowerForEquivalentsW = useMemo(() => {
     if (!selectedConfig) return 0;
 
-    // In total-fleet mode, the "fleet power" concept is the total memory budget (W).
-    if (powerBudgetMode === 'total_fleet') {
+    if (fleetSizingMode === "fleet_total_power") {
       const totalW = parseFloat(powerBudget);
       return Number.isFinite(totalW) && totalW > 0 ? totalW : 0;
     }
 
-    // In per-server mode, use the explicit fleet size input × selected per-server power.
     const servers = fleetServerCountForViz;
     if (!Number.isFinite(servers) || servers <= 0) return 0;
     return selectedConfig.powerPerServer * servers;
-  }, [selectedConfig, powerBudgetMode, powerBudget, fleetServerCountForViz]);
+  }, [selectedConfig, fleetSizingMode, powerBudget, fleetServerCountForViz]);
 
   const fleetEnergyEquivalents = useMemo(() => {
     if (!Number.isFinite(fleetPowerForEquivalentsW) || fleetPowerForEquivalentsW <= 0) return null;
@@ -108,18 +156,23 @@ export default function ServerDeployment() {
 
   const fleetBudgetUsedW = useMemo(() => {
     if (!selectedConfig) return 0;
-    if (powerBudgetMode !== 'total_fleet') return 0;
+    if (fleetSizingMode !== "fleet_total_power") return 0;
     const totalW = parseFloat(powerBudget);
     if (!Number.isFinite(totalW) || totalW <= 0) return 0;
     return fleetServerCountForViz * selectedConfig.powerPerServer;
-  }, [selectedConfig, powerBudgetMode, powerBudget, fleetServerCountForViz]);
+  }, [selectedConfig, fleetSizingMode, powerBudget, fleetServerCountForViz]);
 
   const fleetBudgetRemainingW = useMemo(() => {
     if (!selectedConfig) return 0;
-    if (powerBudgetMode !== 'total_fleet') return 0;
+    if (fleetSizingMode !== "fleet_total_power") return 0;
     const totalW = parseFloat(powerBudget);
     return fleetRemainingBudgetW(totalW, fleetServerCountForViz, selectedConfig.powerPerServer);
-  }, [selectedConfig, powerBudgetMode, powerBudget, fleetServerCountForViz]);
+  }, [selectedConfig, fleetSizingMode, powerBudget, fleetServerCountForViz]);
+
+  const fleetAggregatePeakBandwidthGbps = useMemo(
+    () => fleetAggregateBandwidthGbps(fleetServerCountForViz, selectedPerServerPeakBandwidthGbps),
+    [fleetServerCountForViz, selectedPerServerPeakBandwidthGbps]
+  );
 
   const handleSearch = async () => {
     setError(null);
@@ -133,11 +186,27 @@ export default function ServerDeployment() {
 
     if (!Number.isFinite(powerBudgetNum) || powerBudgetNum <= 0) {
       setError(
-        powerBudgetMode === 'total_fleet'
+        fleetSizingMode === "fleet_total_power"
           ? "Total memory power budget must be a positive number"
-          : "Power budget per server must be a positive number"
+          : "Memory power budget per server must be a positive number"
       );
       return;
+    }
+
+    if (fleetSizingMode === "fleet_total_bandwidth") {
+      const bw = parseFloat(targetFleetBandwidthGbps);
+      if (!Number.isFinite(bw) || bw <= 0) {
+        setError("Target fleet peak bandwidth must be a positive number (GB/s)");
+        return;
+      }
+    }
+
+    if (fleetSizingMode === "fleet_total_capacity") {
+      const tb = parseFloat(targetFleetCapacityTb);
+      if (!Number.isFinite(tb) || tb <= 0) {
+        setError("Target fleet memory capacity must be a positive number (TB)");
+        return;
+      }
     }
 
     if (!Number.isFinite(minDataRateNum) || minDataRateNum <= 0) {
@@ -155,7 +224,7 @@ export default function ServerDeployment() {
       return;
     }
 
-    if (powerBudgetMode === 'per_server') {
+    if (fleetSizingMode === "per_server") {
       const numServersNum = parseFloat(numServers);
       if (!Number.isFinite(numServersNum) || numServersNum < 1 || numServersNum > 1000000) {
         setError("Number of servers must be between 1 and 1,000,000");
@@ -167,7 +236,7 @@ export default function ServerDeployment() {
 
     try {
       const powerBudgetPerServer =
-        powerBudgetMode === 'total_fleet'
+        fleetSizingMode === "fleet_total_power"
           ? powerBudgetNum / TOTAL_BUDGET_REFERENCE_SERVERS
           : powerBudgetNum;
 
@@ -226,41 +295,57 @@ export default function ServerDeployment() {
               <DescriptionWithTooltip
                 variant="card"
                 label="Requirements card"
-                text="Enter power (per server or total fleet), data rate, capacity, DIMM slots, optional server count (per-server mode), and workload. The designer scores presets that satisfy all constraints. You can relax inputs and search again if nothing matches."
+                text="Choose how fleet size is set (per-server count, total memory power, target aggregate bandwidth, or target aggregate capacity), plus per-server power for matching, data rate, capacity, DIMM slots, and workload. The designer scores presets that satisfy all constraints."
               />
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-tutorial="server-req-hardware">
                 <div className="space-y-2 md:col-span-2">
                   <div className="flex items-center gap-2">
-                    <Label>Memory power budget</Label>
-                    <HelpTooltip label="Help: budget scope">
+                    <Label>Fleet sizing</Label>
+                    <HelpTooltip label="Help: fleet sizing">
                       <p className="text-sm">
-                        <strong>Per server:</strong> cap memory draw for each box; enter how many servers for fleet totals
-                        and the rack view.
+                        <strong>Per server:</strong> you set server count; memory power is a per-node cap for search and
+                        fleet stats.
                         <br />
                         <br />
-                        <strong>Total fleet:</strong> cap combined memory power for the whole deployment (watts). Search
-                        uses total ÷ {TOTAL_BUDGET_REFERENCE_SERVERS} as an equivalent per-server limit. After you pick a
-                        row, server count is estimated as how many identical servers fit under your total at that memory
-                        power.
+                        <strong>Total fleet power (W):</strong> combined memory power budget; search uses total ÷{" "}
+                        {TOTAL_BUDGET_REFERENCE_SERVERS} as the per-server matching cap; server count is how many identical
+                        nodes fit under the total at the selected config.
+                        <br />
+                        <br />
+                        <strong>Target fleet bandwidth (GB/s):</strong> theoretical peak aggregate memory bandwidth you
+                        need fleet-wide; the power field is the per-server cap for search; server count is the minimum
+                        homogeneous fleet that meets the bandwidth target.
+                        <br />
+                        <br />
+                        <strong>Target fleet capacity (TB):</strong> installed memory you need fleet-wide; per-server
+                        power caps search; server count is the minimum homogeneous fleet that meets the capacity target.
                       </p>
                     </HelpTooltip>
                   </div>
                   <ToggleGroup
                     type="single"
-                    value={powerBudgetMode}
+                    value={fleetSizingMode}
                     onValueChange={(v) => {
-                      if (v === "per_server" || v === "total_fleet") setPowerBudgetMode(v);
+                      if (FLEET_SIZING_MODES.includes(v as FleetSizingMode)) {
+                        setFleetSizingMode(v as FleetSizingMode);
+                      }
                     }}
                     variant="outline"
                     className="flex flex-wrap justify-start gap-1"
                   >
-                    <ToggleGroupItem value="per_server" className="text-xs sm:text-sm px-3">
-                      Per server (W)
+                    <ToggleGroupItem value="per_server" className="text-xs sm:text-sm px-2 sm:px-3">
+                      Per server
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="total_fleet" className="text-xs sm:text-sm px-3">
-                      Total fleet (W)
+                    <ToggleGroupItem value="fleet_total_power" className="text-xs sm:text-sm px-2 sm:px-3">
+                      Fleet power (W)
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="fleet_total_bandwidth" className="text-xs sm:text-sm px-2 sm:px-3">
+                      Fleet BW (GB/s)
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="fleet_total_capacity" className="text-xs sm:text-sm px-2 sm:px-3">
+                      Fleet cap (TB)
                     </ToggleGroupItem>
                   </ToggleGroup>
                 </div>
@@ -268,30 +353,29 @@ export default function ServerDeployment() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="power-budget">
-                      {powerBudgetMode === "total_fleet"
+                      {fleetSizingMode === "fleet_total_power"
                         ? "Total memory power budget (W)"
                         : "Memory power budget per server (W)"}
                     </Label>
                     <HelpTooltip
                       label={
-                        powerBudgetMode === "total_fleet"
+                        fleetSizingMode === "fleet_total_power"
                           ? "Help: total memory power budget"
-                          : "Help: power budget per server"
+                          : "Help: memory power budget per server"
                       }
                     >
                       <p className="text-sm">
-                        {powerBudgetMode === "total_fleet" ? (
+                        {fleetSizingMode === "fleet_total_power" ? (
                           <>
-                            <strong>Combined memory power envelope</strong> for every server together (watts). Example:
-                            10 kW for all memory in the fleet. The designer converts this to a per-server matching cap
-                            using ÷ {TOTAL_BUDGET_REFERENCE_SERVERS} servers, then ranks DIMM configs that stay under that
-                            per-server limit.
+                            <strong>Combined memory power envelope</strong> for every server together (watts). The
+                            designer converts this to a per-server matching cap using ÷{" "}
+                            {TOTAL_BUDGET_REFERENCE_SERVERS} servers, then ranks DIMM configs that stay under that limit.
                           </>
                         ) : (
                           <>
-                            <strong>Per-server memory power ceiling (W).</strong> All populated DIMMs on that node are
-                            modeled together; their combined draw must stay at or under this cap. Lower values exclude
-                            higher-power module or fill combinations.
+                            <strong>Per-server memory power ceiling (W)</strong> used to filter presets during search.
+                            In bandwidth or capacity fleet modes, fleet size comes from your target; this cap still bounds
+                            which DIMM mixes are allowed per node.
                           </>
                         )}
                       </p>
@@ -303,9 +387,9 @@ export default function ServerDeployment() {
                     step="0.1"
                     value={powerBudget}
                     onChange={(e) => setPowerBudget(e.target.value)}
-                    placeholder={powerBudgetMode === "total_fleet" ? "10000" : "100"}
+                    placeholder={fleetSizingMode === "fleet_total_power" ? "10000" : "100"}
                   />
-                  {powerBudgetMode === "total_fleet" ? (
+                  {fleetSizingMode === "fleet_total_power" ? (
                     <p className="text-xs text-muted-foreground">
                       Matching uses {TOTAL_BUDGET_REFERENCE_SERVERS} servers as reference:{" "}
                       <span className="font-mono">
@@ -315,6 +399,56 @@ export default function ServerDeployment() {
                     </p>
                   ) : null}
                 </div>
+
+                {fleetSizingMode === "fleet_total_bandwidth" ? (
+                  <div className="space-y-2 md:col-span-2">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="target-fleet-bw">Target fleet peak bandwidth (GB/s)</Label>
+                      <HelpTooltip label="Help: target fleet bandwidth">
+                        <p className="text-sm">
+                          <strong>Theoretical peak</strong> aggregate memory bandwidth for the whole fleet (sum of per-node
+                          peaks: data rate × 8 bytes × channel count ÷ 1000 per server). After you pick a configuration,
+                          server count is{" "}
+                          <code className="text-xs">ceil(target ÷ peak GB/s per server)</code>, capped at 1,000,000. Not
+                          sustained workload throughput.
+                        </p>
+                      </HelpTooltip>
+                    </div>
+                    <Input
+                      id="target-fleet-bw"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={targetFleetBandwidthGbps}
+                      onChange={(e) => setTargetFleetBandwidthGbps(e.target.value)}
+                      placeholder="1000"
+                    />
+                  </div>
+                ) : null}
+
+                {fleetSizingMode === "fleet_total_capacity" ? (
+                  <div className="space-y-2 md:col-span-2">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="target-fleet-cap">Target fleet memory capacity (TB)</Label>
+                      <HelpTooltip label="Help: target fleet capacity">
+                        <p className="text-sm">
+                          Minimum <strong>installed DRAM</strong> you want fleet-wide (binary TB, same as stats: GB ×
+                          servers ÷ 1024). Server count is{" "}
+                          <code className="text-xs">ceil(target TB ÷ TB per server)</code>, capped at 1,000,000.
+                        </p>
+                      </HelpTooltip>
+                    </div>
+                    <Input
+                      id="target-fleet-cap"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={targetFleetCapacityTb}
+                      onChange={(e) => setTargetFleetCapacityTb(e.target.value)}
+                      placeholder="100"
+                    />
+                  </div>
+                ) : null}
 
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -427,11 +561,12 @@ export default function ServerDeployment() {
               >
                 <p>
                   <span className="font-medium text-foreground">Power math: </span>
-                  power per server = (module watts per DIMM) × (DIMMs per server). With a{" "}
-                  <strong>per-server</strong> budget, headroom is that cap minus memory draw per box. With a{" "}
-                  <strong>total fleet</strong> budget (W), search uses total ÷ {TOTAL_BUDGET_REFERENCE_SERVERS} as the
-                  per-server matching cap; after you pick a row, fleet size is estimated as how many servers fit under
-                  your total at that memory power.
+                  power per server = (module watts per DIMM) × (DIMMs per server).{" "}
+                  <strong>Per-server</strong> fleet sizing uses your server count and per-node power cap.{" "}
+                  <strong>Total fleet power</strong> uses total ÷ {TOTAL_BUDGET_REFERENCE_SERVERS} for matching and{" "}
+                  <code className="text-xs">floor(total W ÷ W per server)</code> for count.{" "}
+                  <strong>Bandwidth / capacity</strong> targets set count from your goal; per-server W still filters which
+                  configs match the search.
                 </p>
                 <p>
                   <span className="font-medium text-foreground">Ranking: </span>
@@ -451,32 +586,49 @@ export default function ServerDeployment() {
                 <div
                   className={cn(
                     "space-y-2 transition-opacity",
-                    powerBudgetMode === "total_fleet" && "opacity-60"
+                    isDerivedFleetServerCount(fleetSizingMode) && "opacity-60"
                   )}
                 >
                   <div className="flex items-center gap-2">
                     <Label htmlFor="num-servers">
                       Number of Servers
-                      {powerBudgetMode === "total_fleet" ? (
-                        <span className="text-muted-foreground font-normal"> (from total budget)</span>
+                      {fleetSizingMode === "fleet_total_power" ? (
+                        <span className="text-muted-foreground font-normal"> (from power budget)</span>
+                      ) : fleetSizingMode === "fleet_total_bandwidth" ? (
+                        <span className="text-muted-foreground font-normal"> (from bandwidth target)</span>
+                      ) : fleetSizingMode === "fleet_total_capacity" ? (
+                        <span className="text-muted-foreground font-normal"> (from capacity target)</span>
                       ) : null}
                     </Label>
                     <HelpTooltip label="Help: number of servers">
                       <p className="text-sm">
-                        {powerBudgetMode === "total_fleet" ? (
+                        {fleetSizingMode === "fleet_total_power" ? (
                           <>
-                            <strong>Estimated from your total budget</strong> after you select a configuration:{" "}
-                            <code>floor(total W ÷ memory W per server)</code> (0 if a single server exceeds the budget),
-                            capped at 1,000,000. This field is not
-                            editable in total-fleet mode; switch to per-server budget to type a server count directly.
+                            <strong>Estimated from total memory power budget</strong> after you select a configuration:{" "}
+                            <code>floor(total W ÷ memory W per server)</code>, capped at 1,000,000.
+                          </>
+                        ) : fleetSizingMode === "fleet_total_bandwidth" ? (
+                          <>
+                            <strong>Estimated from target fleet peak bandwidth:</strong>{" "}
+                            <code>ceil(target GB/s ÷ peak GB/s per server)</code>, capped at 1,000,000.
+                          </>
+                        ) : fleetSizingMode === "fleet_total_capacity" ? (
+                          <>
+                            <strong>Estimated from target fleet memory (TB):</strong>{" "}
+                            <code>ceil(target TB ÷ TB per server)</code>, capped at 1,000,000.
                           </>
                         ) : (
                           <>
                             <strong>Fleet size (nodes).</strong> Drives aggregate fleet memory power (kW), installed
-                            memory (TB), rack count (42-server racks), and the 3D rack view. Independent of the per-server
-                            power constraint logic; enter your expected deployment scale (1–1,000,000).
+                            memory (TB), rack count (42-server racks), and the 3D rack view (1–1,000,000).
                           </>
                         )}
+                        {isDerivedFleetServerCount(fleetSizingMode) ? (
+                          <>
+                            {" "}
+                            Switch to <strong>Per server</strong> fleet sizing to enter a server count directly.
+                          </>
+                        ) : null}
                       </p>
                     </HelpTooltip>
                   </div>
@@ -486,20 +638,20 @@ export default function ServerDeployment() {
                     step="1"
                     min="1"
                     max="1000000"
-                    disabled={powerBudgetMode === "total_fleet"}
-                    readOnly={powerBudgetMode === "total_fleet"}
+                    disabled={isDerivedFleetServerCount(fleetSizingMode)}
+                    readOnly={isDerivedFleetServerCount(fleetSizingMode)}
                     value={
-                      powerBudgetMode === "total_fleet"
+                      isDerivedFleetServerCount(fleetSizingMode)
                         ? selectedConfig
                           ? String(fleetServerCountForViz)
                           : ""
                         : numServers
                     }
                     onChange={(e) => {
-                      if (powerBudgetMode === "per_server") setNumServers(e.target.value);
+                      if (fleetSizingMode === "per_server") setNumServers(e.target.value);
                     }}
                     placeholder={
-                      powerBudgetMode === "total_fleet"
+                      isDerivedFleetServerCount(fleetSizingMode)
                         ? "Select a configuration"
                         : "100"
                     }
@@ -651,7 +803,7 @@ export default function ServerDeployment() {
 
                       {/* Power Breakdown */}
                       <div className="space-y-2">
-                        {powerBudgetMode === "total_fleet" ? (
+                        {fleetSizingMode === "fleet_total_power" ? (
                           <p className="text-xs text-muted-foreground leading-relaxed">
                             Total memory budget:{" "}
                             <span className="font-mono text-foreground">
@@ -672,7 +824,7 @@ export default function ServerDeployment() {
                           </span>{" "}
                           per server.
                         </p>
-                        {powerBudgetMode === "total_fleet" ? (
+                        {fleetSizingMode === "fleet_total_power" ? (
                           <p className="text-xs text-muted-foreground leading-relaxed">
                             Fleet budget remaining after placing{" "}
                             <span className="font-mono text-foreground">{fleetServerCountForViz.toLocaleString()}</span>{" "}
@@ -680,6 +832,34 @@ export default function ServerDeployment() {
                             <span className="font-mono text-foreground">
                               {(parseFloat(powerBudget) || 0).toFixed(1)} W −{" "}
                               {fleetBudgetUsedW.toFixed(1)} W = {fleetBudgetRemainingW.toFixed(1)} W
+                            </span>
+                            .
+                          </p>
+                        ) : fleetSizingMode === "fleet_total_bandwidth" ? (
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Target fleet peak bandwidth:{" "}
+                            <span className="font-mono text-foreground">
+                              {(parseFloat(targetFleetBandwidthGbps) || 0).toFixed(1)} GB/s
+                            </span>
+                            . At this server count, fleet aggregate peak ≈{" "}
+                            <span className="font-mono text-foreground">
+                              {fleetAggregatePeakBandwidthGbps.toFixed(1)} GB/s
+                            </span>{" "}
+                            (theoretical).
+                          </p>
+                        ) : fleetSizingMode === "fleet_total_capacity" ? (
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Target fleet memory:{" "}
+                            <span className="font-mono text-foreground">
+                              {(parseFloat(targetFleetCapacityTb) || 0).toFixed(1)} TB
+                            </span>
+                            . Installed at this count ≈{" "}
+                            <span className="font-mono text-foreground">
+                              {fleetMemoryCapacityTb(
+                                fleetServerCountForViz,
+                                selectedConfig.totalCapacity
+                              ).toFixed(1)}{" "}
+                              TB
                             </span>
                             .
                           </p>
@@ -755,7 +935,7 @@ export default function ServerDeployment() {
                             </div>
                           </div>
                         ) : null}
-                        {powerBudgetMode === "total_fleet" ? (
+                        {fleetSizingMode === "fleet_total_power" ? (
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                             <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                               <div className="flex items-center gap-2">
@@ -857,12 +1037,30 @@ export default function ServerDeployment() {
                     Visualization: each block is one server at{" "}
                     <span className="font-mono text-foreground">{selectedConfig.powerPerServer.toFixed(3)} W</span>{" "}
                     memory.
-                    {powerBudgetMode === "total_fleet" ? (
+                    {fleetSizingMode === "fleet_total_power" ? (
                       <>
                         {" "}
                         Count = max servers that fit under your{" "}
                         <span className="font-mono text-foreground">{(parseFloat(powerBudget) || 0).toFixed(1)} W</span>{" "}
                         total memory budget.
+                      </>
+                    ) : fleetSizingMode === "fleet_total_bandwidth" ? (
+                      <>
+                        {" "}
+                        Count = minimum servers to reach{" "}
+                        <span className="font-mono text-foreground">
+                          {(parseFloat(targetFleetBandwidthGbps) || 0).toFixed(1)} GB/s
+                        </span>{" "}
+                        aggregate peak bandwidth.
+                      </>
+                    ) : fleetSizingMode === "fleet_total_capacity" ? (
+                      <>
+                        {" "}
+                        Count = minimum servers to reach{" "}
+                        <span className="font-mono text-foreground">
+                          {(parseFloat(targetFleetCapacityTb) || 0).toFixed(1)} TB
+                        </span>{" "}
+                        installed memory.
                       </>
                     ) : (
                       <> Fleet totals use this power times the server count you entered.</>
@@ -891,7 +1089,7 @@ export default function ServerDeployment() {
                       <CardTitle>Large Scale Deployment Statistics</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
                         <div>
                           <p className="text-xs text-muted-foreground">Total Servers</p>
                           <p className="text-2xl font-bold">{fleetServerCountForViz.toLocaleString()}</p>
@@ -901,6 +1099,13 @@ export default function ServerDeployment() {
                           <p className="text-2xl font-bold">
                             {fleetMemoryPowerKw(fleetServerCountForViz, selectedConfig.powerPerServer).toFixed(1)} kW
                           </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Peak fleet BW</p>
+                          <p className="text-2xl font-bold tabular-nums">
+                            {fleetAggregatePeakBandwidthGbps.toFixed(1)} GB/s
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">theoretical aggregate</p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Total Capacity</p>

@@ -1,9 +1,10 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { cleanup, render, screen, within } from '../../tests/unit/next-test-utils';
 import ServerDeployment from '@/app/server-deployment/page';
 import TargetPower from '@/app/target-power/page';
 import { Header } from '@/components/Header';
+import { ONBOARDING_SERVER_DEPLOYMENT_KEY } from '@/lib/onboarding-storage';
 
 afterEach(() => {
   cleanup();
@@ -14,6 +15,9 @@ afterEach(() => {
  * Test TooltipProvider uses delayDuration={0} (see next-test-utils).
  */
 describe('Help (?) tooltips', () => {
+  beforeEach(() => {
+    localStorage.setItem(ONBOARDING_SERVER_DEPLOYMENT_KEY, '1');
+  });
   it('Server Deployment: workload type help opens on hover', async () => {
     const user = userEvent.setup();
     render(<ServerDeployment />);

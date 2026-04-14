@@ -115,25 +115,25 @@ export const SERVER_DEPLOYMENT_TUTORIAL_STEPS: SpotlightStep[] = [
   {
     selector: '[data-tutorial="server-deployment-intro"]',
     title: 'Deployment planning',
-    body: 'Model fleet-scale DDR5 choices: memory power budget per server or total fleet (W), minimum data rate, total memory footprint, DIMM slot count, server count in per-server mode, and workload class. The tool ranks configurations that fit and estimates per-server power.',
+    body: 'Model fleet-scale DDR5 choices: pick fleet sizing (per-server count, total fleet power in W, target aggregate peak bandwidth in GB/s, or target aggregate capacity in TB), set per-server memory power for matching where needed, minimum data rate, memory footprint, DIMM slots, and workload. Ranked results respect those constraints.',
     placement: 'bottom',
   },
   {
     selector: '[data-tutorial="server-requirements-card"]',
     title: 'Requirements card',
-    body: 'All inputs live in this card. Choose per-server or total-fleet power budget, then electrical and capacity limits, then fleet size when using per-server budget, then workload. Invalid combinations raise inline errors before search.',
+    body: 'All inputs live in this card. Fleet sizing drives how server count is chosen: explicit count in per-server mode, or derived from power, bandwidth, or capacity targets after you select a configuration. Bandwidth and capacity modes still use per-server watts to filter presets during search. Invalid combinations raise inline errors before search.',
     placement: 'bottom',
   },
   {
     selector: '[data-tutorial="server-req-hardware"]',
     title: 'Power, speed, capacity',
-    body: 'Budget scope toggles per-server watts vs total fleet watts (search converts total using a 100-server reference). Minimum data rate filters slow parts. Total capacity and max DIMMs shape module count and density.',
+    body: 'Fleet sizing toggles per-server count vs total fleet power (search uses a 100-server reference for the power total) vs bandwidth or capacity targets for the whole fleet. Minimum data rate filters slow parts. Total capacity and max DIMMs shape module count and density.',
     placement: 'top',
   },
   {
     selector: '[data-tutorial="server-req-fleet"]',
     title: 'Fleet & workload',
-    body: 'Server count applies in per-server budget mode for fleet totals and the rack view. In total-fleet mode it is derived from your budget after you pick a configuration. Workload type biases read/write mix for ranking.',
+    body: 'Server count is editable in per-server mode. In fleet-by-power, fleet-by-bandwidth, or fleet-by-capacity modes it is derived from your target after you pick a configuration. Workload type biases read/write mix for ranking.',
     placement: 'top',
   },
   {
