@@ -82,7 +82,13 @@ export const TARGET_POWER_TUTORIAL_STEPS: SpotlightStep[] = [
   {
     selector: '[data-tutorial="target-power-header"]',
     title: 'Inverse (target) design',
-    body: 'Instead of picking a part first, you declare desired core and optional DIMM power. The search scans compatible presets under your current workload and returns the closest memspec plus achieved power and error metrics.',
+    body: 'Instead of picking a part first, you declare desired core and optional DIMM power. The search scans compatible memory presets under the inverse workload you choose on this page and returns the closest memspec plus achieved power and error metrics.',
+    placement: 'bottom',
+  },
+  {
+    selector: '[data-tutorial="target-power-workload"]',
+    title: 'Inverse workload (separate from Configuration)',
+    body: 'Pick an activity preset or upload workload JSON here. This mix drives the forward power model for Target Power only; it is saved separately from Configuration so you can compare scenarios without overwriting your main calculator workload.',
     placement: 'bottom',
   },
   {
@@ -94,7 +100,7 @@ export const TARGET_POWER_TUTORIAL_STEPS: SpotlightStep[] = [
   {
     selector: '[data-tutorial="target-power-targets"]',
     title: 'Power targets',
-    body: 'Enter target total core power in watts; add optional DIMM power if you want both constraints active. The workload from Configuration defines activity, so tune workload there if search results look offset.',
+    body: 'Enter target total core power in watts; add optional DIMM power if you want both constraints active. Those targets are compared against the modeled powers for the inverse workload above, not against Configuration’s separate workload state.',
     placement: 'top',
   },
   {
@@ -208,7 +214,7 @@ export const DIMM_POWER_TUTORIAL_STEPS: SpotlightStep[] = [
 export const SPOTLIGHT_TUTORIAL_MIN_STEPS = {
   home: 6,
   configuration: 6,
-  targetPower: 5,
+  targetPower: 6,
   serverDeployment: 5,
   corePower: 5,
   dimmPower: 4,
