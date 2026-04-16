@@ -10,6 +10,7 @@ import {
 import type { MemSpec, Workload } from '@/lib/types';
 import { memoryPresets, defaultWorkload } from '@/lib/presets';
 import { getInitialBoardState, type BoardState } from '@/lib/builderState';
+import { parseWorkloadJson } from '@/lib/workloadJson';
 
 /** Persisted state for Build your own (board + DIMM sliders). */
 export type VisualBuilderDraft = {
@@ -47,11 +48,14 @@ function parseVisualBuilderDraft(raw: unknown): VisualBuilderDraft | null {
 interface ConfigContextType {
   memspec: MemSpec;
   workload: Workload;
+  inverseWorkload: Workload;
   setMemspec: (memspec: MemSpec) => void;
   setWorkload: (workload: Workload) => void;
+  setInverseWorkload: (workload: Workload) => void;
   visualBuilderDraft: VisualBuilderDraft;
   setVisualBuilderDraft: (u: SetStateAction<VisualBuilderDraft>) => void;
   loadWorkloadFromFile: (file: File) => Promise<void>;
+  loadInverseWorkloadFromFile: (file: File) => Promise<void>;
   loadMemspecFromFile: (file: File) => Promise<void>;
 }
 
@@ -60,6 +64,7 @@ const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 const STORAGE_KEYS = {
   MEMSPEC: 'ddr5_calculator_memspec',
   WORKLOAD: 'ddr5_calculator_workload',
+  INVERSE_WORKLOAD: 'ddr5_inverse_workload',
   BUILDER_DRAFT: 'ddr5_calculator_visual_builder_draft',
 };
 
@@ -87,6 +92,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   // Initialize with defaults - we'll load from localStorage in useEffect
   const [memspec, setMemspecState] = useState<MemSpec>(memoryPresets[0].memspec);
   const [workload, setWorkloadState] = useState<Workload>(defaultWorkload);
+  const [inverseWorkload, setInverseWorkloadState] = useState<Workload>(defaultWorkload);
   const [visualBuilderDraft, setVisualBuilderDraftState] = useState<VisualBuilderDraft>(
     defaultVisualBuilderDraft
   );
@@ -96,6 +102,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const storedMemspec = loadFromStorage<MemSpec>(STORAGE_KEYS.MEMSPEC, null);
     const storedWorkload = loadFromStorage<Workload>(STORAGE_KEYS.WORKLOAD, null);
+    const storedInverseWorkload = loadFromStorage<Workload>(STORAGE_KEYS.INVERSE_WORKLOAD, null);
     const storedDraft = loadFromStorage<unknown>(STORAGE_KEYS.BUILDER_DRAFT, null);
     const draft = storedDraft != null ? parseVisualBuilderDraft(storedDraft) : null;
 
@@ -104,6 +111,11 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     }
     if (storedWorkload) {
       setWorkloadState(storedWorkload);
+    }
+    if (storedInverseWorkload) {
+      setInverseWorkloadState(storedInverseWorkload);
+    } else if (storedWorkload) {
+      setInverseWorkloadState(JSON.parse(JSON.stringify(storedWorkload)) as Workload);
     }
     if (draft) {
       setVisualBuilderDraftState(draft);
@@ -127,6 +139,12 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isInitialized) {
+      saveToStorage(STORAGE_KEYS.INVERSE_WORKLOAD, inverseWorkload);
+    }
+  }, [inverseWorkload, isInitialized]);
+
+  useEffect(() => {
+    if (isInitialized) {
       saveToStorage(STORAGE_KEYS.BUILDER_DRAFT, visualBuilderDraft);
     }
   }, [visualBuilderDraft, isInitialized]);
@@ -139,6 +157,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     setWorkloadState(newWorkload);
   }, []);
 
+  const setInverseWorkload = useCallback((newWorkload: Workload) => {
+    setInverseWorkloadState(newWorkload);
+  }, []);
+
   const setVisualBuilderDraft = useCallback((u: SetStateAction<VisualBuilderDraft>) => {
     setVisualBuilderDraftState((prev) => (typeof u === 'function' ? u(prev) : u));
   }, []);
@@ -146,34 +168,24 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const loadWorkloadFromFile = useCallback(async (file: File) => {
     try {
       const text = await file.text();
-      const json = JSON.parse(text);
-      const workloadData = (json.workload ?? json) as Partial<Workload>;
-      const requiredFields: (keyof Workload)[] = [
-        'BNK_PRE_percent',
-        'CKE_LO_PRE_percent',
-        'CKE_LO_ACT_percent',
-        'PageHit_percent',
-        'RDsch_percent',
-        'RD_Data_Low_percent',
-        'WRsch_percent',
-        'WR_Data_Low_percent',
-        'termRDsch_percent',
-        'termWRsch_percent',
-        'System_tRC_ns',
-        'tRRDsch_ns',
-      ];
-      for (const field of requiredFields) {
-        if (typeof workloadData[field] !== 'number' || Number.isNaN(workloadData[field])) {
-          throw new Error(`Missing or invalid required field: ${field}`);
-        }
-      }
-      setWorkload(workloadData as Workload);
+      setWorkload(parseWorkloadJson(text));
     } catch (error) {
       throw new Error(
         `Failed to load workload file: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }, [setWorkload]);
+
+  const loadInverseWorkloadFromFile = useCallback(async (file: File) => {
+    try {
+      const text = await file.text();
+      setInverseWorkload(parseWorkloadJson(text));
+    } catch (error) {
+      throw new Error(
+        `Failed to load workload file: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }, [setInverseWorkload]);
 
   const loadMemspecFromFile = useCallback(async (file: File) => {
     try {
@@ -248,11 +260,14 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       value={{
         memspec,
         workload,
+        inverseWorkload,
         setMemspec,
         setWorkload,
+        setInverseWorkload,
         visualBuilderDraft,
         setVisualBuilderDraft,
         loadWorkloadFromFile,
+        loadInverseWorkloadFromFile,
         loadMemspecFromFile,
       }}
     >

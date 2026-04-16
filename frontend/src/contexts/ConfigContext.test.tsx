@@ -41,7 +41,9 @@ describe('ConfigContext', () => {
 
     expect(result.current.memspec).toBeDefined();
     expect(result.current.workload).toBeDefined();
+    expect(result.current.inverseWorkload).toBeDefined();
     expect(result.current.memspec.memoryId).toBe(memoryPresets[0].memspec.memoryId);
+    expect(result.current.inverseWorkload.RDsch_percent).toBe(defaultWorkload.RDsch_percent);
   });
 
   it('should save memspec to localStorage when changed', async () => {
@@ -146,6 +148,52 @@ describe('ConfigContext', () => {
     });
 
     expect(result.current.workload.RDsch_percent).toBe(35.0);
+  });
+
+  it('seeds inverseWorkload from stored calculator workload when inverse key is absent', async () => {
+    const savedWorkload: Workload = {
+      ...defaultWorkload,
+      RDsch_percent: 42.0,
+    };
+    localStorageMock.setItem('ddr5_calculator_workload', JSON.stringify(savedWorkload));
+
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <ConfigProvider>{children}</ConfigProvider>
+    );
+
+    const { result } = renderHook(() => useConfig(), { wrapper });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    });
+
+    expect(result.current.inverseWorkload.RDsch_percent).toBe(42.0);
+  });
+
+  it('saves inverseWorkload to localStorage when changed', async () => {
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <ConfigProvider>{children}</ConfigProvider>
+    );
+
+    const { result } = renderHook(() => useConfig(), { wrapper });
+
+    const next: Workload = {
+      ...defaultWorkload,
+      WRsch_percent: 20.0,
+    };
+
+    await act(async () => {
+      result.current.setInverseWorkload(next);
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const saved = localStorageMock.getItem('ddr5_inverse_workload');
+    expect(saved).toBeTruthy();
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      expect(parsed.WRsch_percent).toBe(20.0);
+    }
   });
 });
 

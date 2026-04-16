@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Header } from "@/components/Header";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -16,13 +17,15 @@ import {
 } from "@/components/ui/select";
 import { HelpTooltip } from "@/components/HelpTooltip";
 import { useConfig } from "@/contexts/ConfigContext";
-import type { PowerResult, DIMMPowerResult } from "@/lib/types";
+import type { PowerResult, DIMMPowerResult, Workload } from "@/lib/types";
 import { inverseSearchForTarget } from "@/lib/inverseDDR5";
 import { useRouter } from "next/navigation";
 import { PowerBreakdownChart, TotalPowerDisplay } from "@/components/PowerChart";
 import { SpotlightTutorial } from "@/components/SpotlightTutorial";
 import { TARGET_POWER_TUTORIAL_STEPS } from "@/config/spotlight-page-steps";
 import { ONBOARDING_TARGET_POWER_KEY } from "@/lib/onboarding-storage";
+import { workloadPresets } from "@/lib/presets";
+import { AlertCircle, CheckCircle2, FileJson } from "lucide-react";
 
 type InverseResult = {
   basePresetId: string;
@@ -33,8 +36,20 @@ type InverseResult = {
   dimmPower: DIMMPowerResult;
 };
 
+function matchingWorkloadPresetId(workload: Workload): string {
+  const matching = workloadPresets.find((preset) => {
+    return (
+      Math.abs(preset.workload.RDsch_percent - workload.RDsch_percent) < 0.1 &&
+      Math.abs(preset.workload.WRsch_percent - workload.WRsch_percent) < 0.1 &&
+      Math.abs(preset.workload.BNK_PRE_percent - workload.BNK_PRE_percent) < 0.1 &&
+      Math.abs(preset.workload.tRRDsch_ns - workload.tRRDsch_ns) < 0.1
+    );
+  });
+  return matching?.id ?? "custom";
+}
+
 export default function TargetPower() {
-  const { workload, setMemspec } = useConfig();
+  const { inverseWorkload, setInverseWorkload, loadInverseWorkloadFromFile, setMemspec } = useConfig();
   const router = useRouter();
   const [P_total_core, setPTotalCore] = useState<string>("2.0");
   const [P_total_DIMM, setPTotalDIMM] = useState<string>("");
@@ -43,13 +58,45 @@ export default function TargetPower() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<InverseResult | null>(null);
+  const [inverseWorkloadFile, setInverseWorkloadFile] = useState<File | null>(null);
+  const [inverseWorkloadUploadError, setInverseWorkloadUploadError] = useState<string | null>(null);
+  const [inverseWorkloadUploadSuccess, setInverseWorkloadUploadSuccess] = useState(false);
+
+  const inverseWorkloadSelectValue = useMemo(
+    () => matchingWorkloadPresetId(inverseWorkload),
+    [inverseWorkload]
+  );
+
+  const handleInverseWorkloadPresetChange = useCallback((id: string) => {
+    if (id === "custom") return;
+    const preset = workloadPresets.find((p) => p.id === id);
+    if (!preset) return;
+    setInverseWorkload(preset.workload);
+    setInverseWorkloadFile(null);
+    setInverseWorkloadUploadSuccess(false);
+    setInverseWorkloadUploadError(null);
+  }, [setInverseWorkload]);
+
+  const handleInverseWorkloadFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setInverseWorkloadFile(file);
+      setInverseWorkloadUploadError(null);
+      setInverseWorkloadUploadSuccess(false);
+      try {
+        await loadInverseWorkloadFromFile(file);
+        setInverseWorkloadUploadSuccess(true);
+      } catch (err) {
+        setInverseWorkloadUploadError(
+          err instanceof Error ? err.message : "Failed to load workload file"
+        );
+      }
+    },
+    [loadInverseWorkloadFromFile]
+  );
 
   const handleSubmit = async () => {
-    if (!workload) {
-      setError("Workload is not initialized.");
-      return;
-    }
-
     const targetCore = parseFloat(P_total_core);
     if (!Number.isFinite(targetCore) || targetCore <= 0) {
       setError("Please enter a valid positive number for target total core power.");
@@ -73,7 +120,7 @@ export default function TargetPower() {
       const coreWeightFraction = 1 - dimmWeightFraction;
 
       const data = await inverseSearchForTarget(
-        workload,
+        inverseWorkload,
         {
           P_total_core: targetCore,
           P_total_DIMM: targetDIMM,
@@ -119,11 +166,84 @@ export default function TargetPower() {
               <CardTitle>Target Power (Inverse DDR5)</CardTitle>
               <CardDescription className="text-sm pt-1">
                 The search is <strong className="font-medium text-foreground">deterministic</strong>: same targets,
-                workload, profile, emphasis, and sample budget always yield the same best match. Randomness is only
-                used internally with a fixed seed derived from those inputs.
+                inverse workload (below), profile, emphasis, and sample budget always yield the same best match.
+                Randomness is only used internally with a fixed seed derived from those inputs. This workload is{" "}
+                <strong className="font-medium text-foreground">independent</strong> from Configuration.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-3 rounded-md border border-border/60 bg-muted/20 p-4" data-tutorial="target-power-workload">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">Workload for this search</span>
+                  <HelpTooltip label="Help: inverse workload" triggerClassName="shrink-0">
+                    <p className="text-sm">
+                      Activity percentages used only for Target Power. Choose a preset or upload JSON (same format as
+                      Configuration upload). Sliders are not available here; edit Configuration’s workload separately if
+                      you need a custom mix there.
+                    </p>
+                  </HelpTooltip>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground">Activity preset</label>
+                  <Select value={inverseWorkloadSelectValue} onValueChange={handleInverseWorkloadPresetChange}>
+                    <SelectTrigger className="h-9 max-w-md" id="inverse-workload-preset">
+                      <SelectValue placeholder="Select workload" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workloadPresets.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="custom" disabled>
+                        Custom (JSON upload)
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {inverseWorkloadSelectValue === "custom" ? (
+                    <p className="text-xs text-muted-foreground">
+                      Current workload was loaded from a file or does not match a built-in preset.
+                    </p>
+                  ) : null}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="inverse-workload-file" className="text-xs font-medium text-muted-foreground">
+                    Workload JSON file
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    Root fields or a <code className="text-[10px]">workload</code> wrapper; required fields match
+                    Configuration upload.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input
+                      id="inverse-workload-file"
+                      type="file"
+                      accept=".json,application/json"
+                      className="max-w-md flex-1 min-w-[12rem]"
+                      onChange={handleInverseWorkloadFileChange}
+                    />
+                    {inverseWorkloadFile ? (
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <FileJson className="h-3 w-3 shrink-0" aria-hidden />
+                        {inverseWorkloadFile.name}
+                      </span>
+                    ) : null}
+                  </div>
+                  {inverseWorkloadUploadSuccess ? (
+                    <Alert className="bg-accent/10 border-accent/30 py-2">
+                      <CheckCircle2 className="h-4 w-4 text-accent" />
+                      <AlertDescription className="text-sm">Workload loaded for inverse search.</AlertDescription>
+                    </Alert>
+                  ) : null}
+                  {inverseWorkloadUploadError ? (
+                    <Alert variant="destructive" className="py-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription className="text-sm">{inverseWorkloadUploadError}</AlertDescription>
+                    </Alert>
+                  ) : null}
+                </div>
+              </div>
+
               <div
                 className="grid grid-cols-1 md:grid-cols-2 gap-4"
                 data-tutorial="target-power-optimization"
@@ -217,7 +337,7 @@ export default function TargetPower() {
                   <HelpTooltip label="Help: target core power">
                     <p className="text-sm">
                       <strong>Target die (core) power per DRAM device (W).</strong> The inverse search minimizes error
-                      against modeled <code>P_total_core</code> for one die under the current workload. It is not the
+                      against modeled <code>P_total_core</code> for one die under the inverse workload you set above. It is not the
                       full module: interface rails and PMIC / RCD overhead are excluded unless you also constrain DIMM
                       total.
                     </p>

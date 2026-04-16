@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,14 +31,18 @@ export function PresetSelector({
   currentMemspec,
   onSelectMemory,
   onSelectWorkload,
-  defaultManufacturer,
+  defaultManufacturer: _defaultManufacturer,
 }: PresetSelectorProps) {
   const [memoryFamily, setMemoryFamily] = useState<'DDR5' | 'LPDDR'>('DDR5');
 
-  const filteredMemoryPresets = memoryPresets.filter(
-    (p) => presetFamilyOf(p) === memoryFamily
+  const filteredMemoryPresets = useMemo(
+    () => memoryPresets.filter((p) => presetFamilyOf(p) === memoryFamily),
+    [memoryFamily],
   );
-  const manufacturers = [...new Set(filteredMemoryPresets.map((p) => p.manufacturer))];
+  const manufacturers = useMemo(
+    () => [...new Set(filteredMemoryPresets.map((p) => p.manufacturer))],
+    [filteredMemoryPresets],
+  );
 
   const [activeTab, setActiveTab] = useState(
     () => memoryPresets.find((p) => p.id === selectedMemoryId)?.manufacturer ?? 'Micron',
@@ -59,10 +63,14 @@ export function PresetSelector({
 
   useEffect(() => {
     const preset = memoryPresets.find((p) => p.id === selectedMemoryId);
-    if (preset && presetFamilyOf(preset) === memoryFamily && manufacturers.includes(preset.manufacturer)) {
+    if (!preset || presetFamilyOf(preset) !== memoryFamily) return;
+    const mfrsInFamily = new Set(
+      memoryPresets.filter((p) => presetFamilyOf(p) === memoryFamily).map((p) => p.manufacturer),
+    );
+    if (mfrsInFamily.has(preset.manufacturer)) {
       setActiveTab(preset.manufacturer);
     }
-  }, [selectedMemoryId, memoryFamily, manufacturers]);
+  }, [selectedMemoryId, memoryFamily]);
 
   return (
     <Card className="power-card">
